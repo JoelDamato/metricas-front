@@ -5,7 +5,11 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      external: ['axios'], // Marca axios como externo
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'axios'], // Divide las dependencias externas
+        },
+      },
     },
   },
 });
