@@ -3,13 +3,13 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: '/', // Asegura que las rutas sean relativas al dominio raíz
   build: {
     rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'axios'], // Divide las dependencias externas
-        },
-      },
+      input: '/index.html',
     },
+  },
+  server: {
+    historyApiFallback: true, // Sirve index.html para rutas no encontradas
   },
 });
