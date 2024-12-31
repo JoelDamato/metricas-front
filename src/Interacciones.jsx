@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Pie, Bar } from "react-chartjs-2";
-import axios from "axios";
+import axios from 'axios';
+
+
 
 export default function StaticMetricsChart() {
   const [isLoading, setIsLoading] = useState(true);
@@ -74,199 +76,207 @@ export default function StaticMetricsChart() {
   }, []);
 
   const prepareChartData = (data) => {
-    return {
-      labels: [
-        "Nuevas Conversaciones",
-        "Respuestas a Primer Contacto",
-        "Links Enviados",
-        "Agendamientos",
-        "Aplica",
-        "Interacciones",
-        "Llamadas Agendadas",
-      ],
-      datasets: [
-        {
-          data: [
-            data.total_nuevas_conversaciones,
-            data.respuestas_primer_contacto,
-            data.link_enviado,
-            data.agendamiento,
-            data.aplica,
-            data.interacciones,
-            data.llamadas_agendadas,
+
+        return {
+          labels: [
+            "Nuevas Conversaciones",
+            "Respuestas a Primer Contacto",
+            "Links Enviados",
+            "Agendamientos",
+            "Aplica",
+            "Interacciones",
+            "Llamadas Agendadas",
           ],
-          backgroundColor: [
-            "#FF6384",
-            "#36A2EB",
-            "#FFCE56",
-            "#4BC0C0",
-            "#9966FF",
-            "#FF9F40",
-            "#8AC926",
+          datasets: [
+            {
+              data: [
+                data.total_nuevas_conversaciones,
+                data.respuestas_primer_contacto,
+                data.link_enviado,
+                data.agendamiento,
+                data.aplica,
+                data.interacciones,
+                data.llamadas_agendadas,
+              ],
+              backgroundColor: [
+                "#FF6384",
+                "#36A2EB",
+                "#FFCE56",
+                "#4BC0C0",
+                "#9966FF",
+                "#FF9F40",
+                "#8AC926",
+              ],
+            },
           ],
-        },
-      ],
-    };
-  };
-
-  const prepareComparisonData = (currentMonthData, previousMonthData) => {
-    const labels = [
-      "Nuevas Conversaciones",
-      "Respuestas a Primer Contacto",
-      "Links Enviados",
-      "Agendamientos",
-      "Aplica",
-      "Interacciones",
-      "Llamadas Agendadas",
-    ];
-
-    const currentValues = [
-      currentMonthData.total_nuevas_conversaciones,
-      currentMonthData.respuestas_primer_contacto,
-      currentMonthData.link_enviado,
-      currentMonthData.agendamiento,
-      currentMonthData.aplica,
-      currentMonthData.interacciones,
-      currentMonthData.llamadas_agendadas,
-    ];
-
-    const previousValues = [
-      previousMonthData.total_nuevas_conversaciones,
-      previousMonthData.respuestas_primer_contacto,
-      previousMonthData.link_enviado,
-      previousMonthData.agendamiento,
-      previousMonthData.aplica,
-      previousMonthData.interacciones,
-      previousMonthData.llamadas_agendadas,
-    ];
-
-    return {
-      labels,
-      datasets: [
-        {
-          label: `Mes: ${monthNames[selectedCurrentMonth]}`,
-          data: currentValues,
-          backgroundColor: "#36A2EB",
-        },
-        {
-          label: `Mes: ${monthNames[selectedPreviousMonth]}`,
-          data: previousValues,
-          backgroundColor: "#FF6384",
-        },
-      ],
-    };
-  };
-
-  const currentMonthChartData = dataByMonth[selectedCurrentMonth]
-    ? prepareChartData(dataByMonth[selectedCurrentMonth])
-    : null;
-
-  const previousMonthChartData = dataByMonth[selectedPreviousMonth]
-    ? prepareChartData(dataByMonth[selectedPreviousMonth])
-    : null;
-
-  const comparisonChartData =
-    dataByMonth[selectedCurrentMonth] && dataByMonth[selectedPreviousMonth]
-      ? prepareComparisonData(
-          dataByMonth[selectedCurrentMonth],
-          dataByMonth[selectedPreviousMonth]
-        )
-      : null;
-
-  return (
-    <div className="flex flex-col items-center min-h-screen bg-gray-100 text-gray-800">
-      <main className="w-full max-w-4xl p-8">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full bg-gray-200">
-            <div className="loader border-t-4 border-blue-500 w-12 h-12 rounded-full animate-spin"></div>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              <div className="bg-white p-4 shadow rounded-md">
-                <label className="block mb-2 font-bold text-center">
-                  Mes Actual
-                </label>
-                <select
-                  className="w-full p-2 border rounded-md mb-4"
-                  value={selectedCurrentMonth}
-                  onChange={(e) => setSelectedCurrentMonth(e.target.value)}
-                >
-                  {Object.keys(dataByMonth).map((month) => (
-                    <option key={month} value={month}>
-                      {monthNames[month]}
-                    </option>
-                  ))}
-                </select>
-                {currentMonthChartData ? (
-                  <Pie data={currentMonthChartData} />
-                ) : (
-                  <div className="text-center text-gray-500">
-                    No hay datos para este mes.
-                  </div>
-                )}
+        };
+      };
+    
+      const prepareComparisonData = (currentMonthData, previousMonthData) => {
+        const labels = [
+          "Nuevas Conversaciones",
+          "Respuestas a Primer Contacto",
+          "Links Enviados",
+          "Agendamientos",
+          "Aplica",
+          "Interacciones",
+          "Llamadas Agendadas",
+        ];
+    
+        const currentValues = [
+          currentMonthData.total_nuevas_conversaciones,
+          currentMonthData.respuestas_primer_contacto,
+          currentMonthData.link_enviado,
+          currentMonthData.agendamiento,
+          currentMonthData.aplica,
+          currentMonthData.interacciones,
+          currentMonthData.llamadas_agendadas,
+        ];
+    
+        const previousValues = [
+          previousMonthData.total_nuevas_conversaciones,
+          previousMonthData.respuestas_primer_contacto,
+          previousMonthData.link_enviado,
+          previousMonthData.agendamiento,
+          previousMonthData.aplica,
+          previousMonthData.interacciones,
+          previousMonthData.llamadas_agendadas,
+        ];
+    
+        return {
+          labels,
+          datasets: [
+            {
+              label: `Mes: ${monthNames[selectedCurrentMonth]}`,
+              data: currentValues,
+              backgroundColor: "#36A2EB",
+            },
+            {
+              label: `Mes: ${monthNames[selectedPreviousMonth]}`,
+              data: previousValues,
+              backgroundColor: "#FF6384",
+            },
+          ],
+        };
+      };
+    
+      const currentMonthChartData = dataByMonth[selectedCurrentMonth]
+        ? prepareChartData(dataByMonth[selectedCurrentMonth])
+        : null;
+    
+      const previousMonthChartData = dataByMonth[selectedPreviousMonth]
+        ? prepareChartData(dataByMonth[selectedPreviousMonth])
+        : null;
+    
+      const comparisonChartData =
+        dataByMonth[selectedCurrentMonth] && dataByMonth[selectedPreviousMonth]
+          ? prepareComparisonData(
+              dataByMonth[selectedCurrentMonth],
+              dataByMonth[selectedPreviousMonth]
+            )
+          : null;
+    
+      return (
+        <div className="flex flex-col items-center min-h-screen bg-gray-100 text-gray-800">
+          <main className="w-full max-w-4xl p-4 md:p-8">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full bg-gray-200">
+                <div className="loader border-t-4 border-blue-500 w-12 h-12 rounded-full animate-spin"></div>
               </div>
-              <div className="bg-white p-4 shadow rounded-md">
-                <label className="block mb-2 font-bold text-center">
-                  Mes Anterior
-                </label>
-                <select
-                  className="w-full p-2 border rounded-md mb-4"
-                  value={selectedPreviousMonth}
-                  onChange={(e) => setSelectedPreviousMonth(e.target.value)}
-                >
-                  {Object.keys(dataByMonth).map((month) => (
-                    <option key={month} value={month}>
-                      {monthNames[month]}
-                    </option>
-                  ))}
-                </select>
-                {previousMonthChartData ? (
-                  <Pie data={previousMonthChartData} />
-                ) : (
-                  <div className="text-center text-gray-500">
-                    No hay datos para este mes.
+            ) : (
+              <>
+                {/* Selección de Meses y Charts en una grid responsiva */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  {/* Chart Mes Actual */}
+                  <div className="bg-white p-4 shadow rounded-md">
+                    <label className="block mb-2 font-bold text-center">
+                      Mes Actual
+                    </label>
+                    <select
+                      className="w-full p-2 border rounded-md mb-4"
+                      value={selectedCurrentMonth}
+                      onChange={(e) => setSelectedCurrentMonth(e.target.value)}
+                    >
+                      {Object.keys(dataByMonth).map((month) => (
+                        <option key={month} value={month}>
+                          {monthNames[month]}
+                        </option>
+                      ))}
+                    </select>
+                    {currentMonthChartData ? (
+                      <Pie data={currentMonthChartData} />
+                    ) : (
+                      <div className="text-center text-gray-500">
+                        No hay datos para este mes.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-            <div className="bg-white p-6 shadow rounded-md">
-              <h2 className="text-lg font-bold text-center mb-4">
-                Comparación entre Meses
-              </h2>
-              {comparisonChartData ? (
-                <Bar
-                  data={comparisonChartData}
-                  options={{
-                    responsive: true,
-                    plugins: {
-                      legend: {
-                        position: "top",
-                      },
-                      title: {
-                        display: true,
-                        text: `Comparación entre ${monthNames[selectedCurrentMonth]} y ${monthNames[selectedPreviousMonth]}`,
-                      },
-                    },
-                    scales: {
-                      x: {
-                        stacked: false,
-                      },
-                      y: {
-                        beginAtZero: true,
-                      },
-                    },
-                  }}
-                />
-              ) : (
-                <div className="text-center text-gray-500">
-                  No hay datos para la comparación de estos meses.
+    
+                  {/* Chart Mes Anterior */}
+                  <div className="bg-white p-4 shadow rounded-md">
+                    <label className="block mb-2 font-bold text-center">
+                      Mes Anterior
+                    </label>
+                    <select
+                      className="w-full p-2 border rounded-md mb-4"
+                      value={selectedPreviousMonth}
+                      onChange={(e) => setSelectedPreviousMonth(e.target.value)}
+                    >
+                      {Object.keys(dataByMonth).map((month) => (
+                        <option key={month} value={month}>
+                          {monthNames[month]}
+                        </option>
+                      ))}
+                    </select>
+                    {previousMonthChartData ? (
+                      <Pie data={previousMonthChartData} />
+                    ) : (
+                      <div className="text-center text-gray-500">
+                        No hay datos para este mes.
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </>
-        )}
-      </main>
-    </div>
-  );
-}
+    
+                {/* Comparación entre Meses */}
+                <div className="bg-white p-4 md:p-6 shadow rounded-md">
+                  <h2 className="text-lg font-bold text-center mb-4">
+                    Comparación entre Meses
+                  </h2>
+                  {comparisonChartData ? (
+                    <Bar
+                      data={comparisonChartData}
+                      options={{
+                        responsive: true,
+                        plugins: {
+                          legend: {
+                            position: "top",
+                          },
+                          title: {
+                            display: true,
+                            text: `Comparación entre ${monthNames[selectedCurrentMonth]} y ${monthNames[selectedPreviousMonth]}`,
+                          },
+                        },
+                        scales: {
+                          x: {
+                            stacked: false,
+                          },
+                          y: {
+                            beginAtZero: true,
+                          },
+                        },
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center text-gray-500">
+                      No hay datos para la comparación de estos meses.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </main>
+        </div>
+      );
+    }
+    

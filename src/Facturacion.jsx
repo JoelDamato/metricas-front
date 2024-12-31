@@ -162,9 +162,11 @@ export default function CashMetricsChart() {
   const employees = [...new Set([...originalData.map((d) => d.Closer), ...originalData.map((d) => d.Setter)])].filter(Boolean);
 
   return (
-    <div className="flex min-h-screen bg-gray-100 text-gray-800">
-      <aside className="w-1/4 p-6 bg-white shadow-lg">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 text-gray-800">
+      {/* ASIDE / FILTROS */}
+      <aside className="w-full md:w-1/4 p-6 bg-white shadow-lg">
         <h2 className="text-2xl font-semibold mb-4">Filtros</h2>
+
         <div className="mb-4">
           <label>Desde:</label>
           <input
@@ -174,6 +176,7 @@ export default function CashMetricsChart() {
             onChange={(e) => setStartDate(e.target.value)}
           />
         </div>
+
         <div className="mb-4">
           <label>Hasta:</label>
           <input
@@ -183,6 +186,7 @@ export default function CashMetricsChart() {
             onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
+
         <h3 className="font-semibold mb-2">Métricas:</h3>
         {metrics.map((metric) => (
           <div key={metric} className="flex items-center justify-between mb-2">
@@ -206,7 +210,9 @@ export default function CashMetricsChart() {
               >
                 <div
                   className={`absolute top-1/2 transform -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-300 ${
-                    selectedMetrics.includes(metric) ? "translate-x-7" : "translate-x-0"
+                    selectedMetrics.includes(metric)
+                      ? "translate-x-7"
+                      : "translate-x-0"
                   }`}
                 ></div>
               </div>
@@ -233,7 +239,9 @@ export default function CashMetricsChart() {
               />
               <div
                 className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${
-                  selectedEmployees.includes(employee) ? "bg-green-500" : "bg-gray-300"
+                  selectedEmployees.includes(employee)
+                    ? "bg-green-500"
+                    : "bg-gray-300"
                 }`}
               >
                 <div
@@ -250,17 +258,24 @@ export default function CashMetricsChart() {
         ))}
       </aside>
 
-      <main className="w-3/4 p-8">
+      {/* MAIN / CONTENIDO */}
+      <main className="w-full md:w-3/4 p-8">
         {isLoading ? (
           <div className="flex items-center justify-center h-full bg-gray-200">
             <div className="loader border-t-4 border-blue-500 w-12 h-12 rounded-full animate-spin"></div>
           </div>
         ) : selectedMetrics.length > 0 ? (
           <>
-            <h1 className="text-3xl font-bold text-blue-700 text-center mb-6">Panel de Métricas</h1>
-            <div className="grid grid-cols-3 gap-6 mb-6">
+            <h1 className="text-3xl font-bold text-blue-700 text-center mb-6">
+              Panel de Métricas
+            </h1>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               {Object.entries(totals).map(([metric, value]) => (
-                <MetricBox key={metric} title={metric.replace("_", " ")} value={value} />
+                <MetricBox
+                  key={metric}
+                  title={metric.replace("_", " ")}
+                  value={value}
+                />
               ))}
             </div>
             <div className="bg-white p-6 shadow rounded-md">
@@ -268,21 +283,27 @@ export default function CashMetricsChart() {
             </div>
           </>
         ) : (
-          <div className="text-center text-gray-500">Seleccione al menos una métrica para visualizar los datos.</div>
+          <div className="text-center text-gray-500">
+            Seleccione al menos una métrica para visualizar los datos.
+          </div>
         )}
       </main>
     </div>
   );
 }
 
-const MetricBox = ({ title, value }) => (
-  <div className="p-4 bg-white shadow rounded-md text-center">
-    <p className="text-2xl font-bold text-blue-600">{value}</p>
-    <p className="text-gray-600">{title}</p>
-  </div>
-);
+// Ejemplo de componente MetricBox (puedes dejarlo en el mismo archivo o en otro)
+export function MetricBox({ title, value }) {
+  return (
+    <div className="p-4 bg-white shadow rounded-md text-center">
+      <p className="text-2xl font-bold text-blue-600">{value}</p>
+      <p className="text-gray-600">{title}</p>
+    </div>
+  );
+}
 
-const getLineColor = (index) => {
+// Función opcional para asignar colores a cada línea (si usas Chart.js u otra librería)
+export const getLineColor = (index) => {
   const colors = ["#3B82F6", "#22C55E", "#9333EA", "#FACC15", "#EF4444"];
   return colors[index % colors.length];
 };

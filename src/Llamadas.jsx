@@ -13,7 +13,6 @@ export default function SalesMetricsChart() {
   const [isLoading, setIsLoading] = useState(false);
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
-  
   useEffect(() => {
     const API_BASE_URL =
       process.env.NODE_ENV === 'production'
@@ -185,8 +184,9 @@ export default function SalesMetricsChart() {
   const totals = calculateTotals();
 
   return (
-    <div className="flex min-h-screen bg-gray-100 text-gray-800">
-      <aside className="w-1/4 p-6 bg-white shadow-lg">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 text-gray-800">
+      {/* ASIDE / FILTROS */}
+      <aside className="md:w-1/4 w-full p-6 bg-white shadow-lg">
         <h2 className="text-2xl font-semibold mb-4">Filtros</h2>
         <div className="mb-4">
           <label>Desde:</label>
@@ -206,19 +206,23 @@ export default function SalesMetricsChart() {
             onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
-        <div className="mb-4 flex gap-x-4">
+        <div className="mb-4 flex flex-col sm:flex-row gap-4">
           <button
             onClick={() => {
               const today = new Date();
-              const lastYear = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+              const lastYear = new Date(
+                today.getFullYear() - 1,
+                today.getMonth(),
+                today.getDate()
+              );
               setStartDate(lastYear.toISOString().split("T")[0]);
               setEndDate(today.toISOString().split("T")[0]);
               setActiveButton("last12Months");
             }}
-            className={`flex-1 p-2 rounded-md ${
+            className={`flex-1 p-2 rounded-md text-center ${
               activeButton === "last12Months"
                 ? "bg-blue-700 text-white"
-                : "bg-black text-white hover:bg-black"
+                : "bg-black text-white hover:bg-gray-900"
             }`}
           >
             Últimos 12 meses
@@ -226,16 +230,24 @@ export default function SalesMetricsChart() {
           <button
             onClick={() => {
               const today = new Date();
-              const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-              const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+              const firstDayOfMonth = new Date(
+                today.getFullYear(),
+                today.getMonth(),
+                1
+              );
+              const lastDayOfMonth = new Date(
+                today.getFullYear(),
+                today.getMonth() + 1,
+                0
+              );
               setStartDate(firstDayOfMonth.toISOString().split("T")[0]);
               setEndDate(lastDayOfMonth.toISOString().split("T")[0]);
               setActiveButton("currentMonth");
             }}
-            className={`flex-1 p-2 rounded-md ${
+            className={`flex-1 p-2 rounded-md text-center ${
               activeButton === "currentMonth"
                 ? "bg-blue-700 text-white"
-                : "bg-black text-white hover:bg-black"
+                : "bg-black text-white hover:bg-gray-900"
             }`}
           >
             Mes Actual
@@ -251,6 +263,7 @@ export default function SalesMetricsChart() {
             onChange={(e) => setTargetValue(e.target.value)}
           />
         </div>
+
         <h3 className="font-semibold mb-2">Métricas:</h3>
         {metrics.map((metric) => (
           <div key={metric} className="flex items-center justify-between mb-2">
@@ -274,11 +287,15 @@ export default function SalesMetricsChart() {
               >
                 <div
                   className={`absolute top-1/2 transform -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-300 ${
-                    selectedMetrics.includes(metric) ? "translate-x-7" : "translate-x-0"
+                    selectedMetrics.includes(metric)
+                      ? "translate-x-7"
+                      : "translate-x-0"
                   }`}
                 ></div>
               </div>
-              <span className="ml-3 text-sm">{metric.replace("_", " ")}</span>
+              <span className="ml-3 text-sm">
+                {metric.replace("_", " ")}
+              </span>
             </label>
           </div>
         ))}
@@ -318,15 +335,18 @@ export default function SalesMetricsChart() {
         ))}
       </aside>
 
-      <main className="w-3/4 p-8">
+      {/* MAIN / CONTENIDO PRINCIPAL */}
+      <main className="md:w-3/4 w-full p-8">
         {isLoading ? (
           <div className="flex items-center justify-center h-full bg-gray-200">
             <div className="loader border-t-4 border-blue-500 w-12 h-12 rounded-full animate-spin"></div>
           </div>
         ) : selectedMetrics.length > 0 ? (
           <>
-            <h1 className="text-3xl font-bold text-blue-700 text-center mb-6">Panel de Métricas</h1>
-            <div className="grid grid-cols-3 gap-6 mb-6">
+            <h1 className="text-3xl font-bold text-blue-700 text-center mb-6">
+              Panel de Métricas
+            </h1>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               {Object.entries(totals).map(([metric, value]) => (
                 <MetricBox key={metric} title={metric.replace("_", " ")} value={value} />
               ))}
@@ -336,7 +356,9 @@ export default function SalesMetricsChart() {
             </div>
           </>
         ) : (
-          <div className="text-center text-gray-500">Seleccione al menos una métrica para visualizar los datos.</div>
+          <div className="text-center text-gray-500">
+            Seleccione al menos una métrica para visualizar los datos.
+          </div>
         )}
       </main>
     </div>
@@ -350,6 +372,7 @@ const MetricBox = ({ title, value }) => (
   </div>
 );
 
+// Función para asignar colores a cada línea (opcional si usas Chart.js u otra librería)
 const getLineColor = (index) => {
   const colors = ["#3B82F6", "#22C55E", "#9333EA", "#FACC15", "#EF4444"];
   return colors[index % colors.length];
