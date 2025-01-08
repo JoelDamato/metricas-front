@@ -200,7 +200,7 @@ export default function SalesMetricsTable() {
   onChange={(e) => setSelectedCloser(e.target.value)}
   className="p-2 border rounded-md"
 >
-  <option value="">Todos los Closer</option>
+  <option value="">Todas las llamadas</option>
   {[...new Set(originalData.map((item) => item.Closer))]
     .filter((closer) => closer && closer !== "Sin closer") // Excluir "Sin closer"
     .map((closer) => (
@@ -216,7 +216,7 @@ export default function SalesMetricsTable() {
           onChange={(e) => setSelectedOrigin(e.target.value)}
           className="p-2 border rounded-md"
         >
-          <option value="">Todos las Llamadas</option>
+          <option value="">Todos los Orígenes</option>
           {[...new Set(originalData.map((item) => item.Origen))].map((origin) => (
             <option key={origin} value={origin}>
               {origin}
