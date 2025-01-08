@@ -11,10 +11,11 @@ Chart.register(ArcElement, Tooltip, Legend, ChartDataLabels);
 const Dashboard = () => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
-  const [groupedData, setGroupedData] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [category, setCategory] = useState("Club");
   const [selectedCloser, setSelectedCloser] = useState(null);
+  const [groupedData, setGroupedData] = useState([]); // Estado para ranking
+  const [rawGroupedData, setRawGroupedData] = useState([]); // Estado para todos los datos agrupados
 
   useEffect(() => {
     const API_BASE_URL =
@@ -48,61 +49,64 @@ const Dashboard = () => {
     const month = date.getMonth() + 1;
     const year = date.getFullYear();
 
-    // Filtrar registros del mes/año seleccionado
-    const filtered = data.filter((item) => {
-      const itemDate = new Date(item["Fecha creada"]);
-      return (
-        itemDate.getMonth() + 1 === month &&
-        itemDate.getFullYear() === year &&
-        item.Closer !== "Sin closer" // Excluir registros con "Sin closer"
-      );
-    });
+    // Agrupar y acumular estadísticas mensuales
+    const grouped = data.reduce((acc, curr) => {
+      const itemDate = new Date(curr["Fecha creada"]);
+      const itemMonth = itemDate.getMonth() + 1;
+      const itemYear = itemDate.getFullYear();
 
-    // Agrupar y acumular
-    const grouped = filtered.reduce((acc, curr) => {
-      const closer = curr.Closer;
-      if (!acc[closer]) {
-        acc[closer] = {
-          Closer: closer,
-          "Venta CLUB": 0,
-          "Ofertas Ganadas MEG": 0,
-          Facturacion: 0,
-          "Cash Collected": 0,
-          Details: [],
-          // NUEVOS CAMPOS
-          llamadasAgendadas: 0,
-          llamadasEfectuadas: 0,
-          aplicaCount: 0,
-          noAplicaCount: 0,
-        };
+      // Solo procesar datos del mes/año seleccionados
+      if (itemMonth === month && itemYear === year) {
+        const closer = curr.Closer || "Sin closer"; // Default value for "Closer"
+
+        if (!acc[closer]) {
+          acc[closer] = {
+            Closer: closer,
+            "Venta CLUB": 0,
+            "Ofertas Ganadas MEG": 0,
+            Facturacion: 0,
+            "Cash Collected": 0,
+            llamadasAgendadas: 0,
+            llamadasEfectuadas: 0,
+            aplicaCount: 0,
+            noAplicaCount: 0,
+          };
+        }
+
+        // Acumular estadísticas
+        acc[closer]["Venta CLUB"] += curr["Venta CLUB"] || 0;
+        acc[closer]["Ofertas Ganadas MEG"] += curr["Ofertas Ganadas MEG"] || 0;
+        acc[closer].Facturacion += curr.Facturacion || 0;
+        acc[closer]["Cash Collected"] += curr["Cash Collected"] || 0;
+        acc[closer].llamadasAgendadas += curr["Llamadas Agendadas"] || 0;
+        acc[closer].llamadasEfectuadas += curr["Llamadas Efectuadas"] || 0;
+
+        const aplicaValue = (curr.Aplica || "").trim().toLowerCase();
+        if (aplicaValue === "aplica") {
+          acc[closer].aplicaCount += 1;
+        } else if (aplicaValue === "no aplica") {
+          acc[closer].noAplicaCount += 1;
+        }
       }
-
-      acc[closer]["Venta CLUB"] += curr["Venta CLUB"] || 0;
-      acc[closer]["Ofertas Ganadas MEG"] += curr["Ofertas Ganadas MEG"] || 0;
-      acc[closer].Facturacion += curr.Facturacion || 0;
-      acc[closer]["Cash Collected"] += curr["Cash Collected"] || 0;
-
-      // Llamadas Agendadas
-      acc[closer].llamadasAgendadas += curr["Llamadas Agendadas"] || 0;
-
-      // Llamadas Efectuadas
-      acc[closer].llamadasEfectuadas += curr["Llamadas Efectuadas"] || 0;
-
-      // Aplica / No aplica
-      const aplicaValue = (curr.Aplica || "").trim().toLowerCase();
-
-      if (aplicaValue === "aplica") {
-        acc[closer].aplicaCount += 1;
-      } else if (aplicaValue === "no aplica") {
-        acc[closer].noAplicaCount += 1;
-      }
-
-      acc[closer].Details.push(curr);
       return acc;
     }, {});
 
-    setFilteredData(filtered);
-    setGroupedData(Object.values(grouped));
+    // Separar para ranking (excluir "Sin closer")
+    const rankedData = Object.values(grouped).filter(
+      (item) => item.Closer !== "Sin closer"
+    );
+
+    setFilteredData(
+      data.filter((item) => {
+        const itemDate = new Date(item["Fecha creada"]);
+        return (
+          itemDate.getMonth() + 1 === month && itemDate.getFullYear() === year
+        );
+      })
+    );
+
+    setRawGroupedData(Object.values(grouped)); // Guarda todos los datos agrupados, incluidos "Sin closer"
+    setGroupedData(rankedData); // Ranking excluye "Sin closer"
   };
 
   const handleDateChange = (date) => {
@@ -178,70 +182,47 @@ const Dashboard = () => {
   };
 
   // Cálculo de totales
-  const totals = groupedData.reduce(
-    (acc, item) => {
-      acc.totalClub += item["Venta CLUB"];
-      acc.totalMEG += item["Ofertas Ganadas MEG"];
-      acc.totalFacturacion += item.Facturacion;
-      acc.totalCash += item["Cash Collected"];
-      acc.totalLlamadasAgendadas += item.llamadasAgendadas;
-      acc.totalLlamadasEfectuadas += item.llamadasEfectuadas;
-      acc.totalAplica += item.aplicaCount;
-      acc.totalNoAplica += item.noAplicaCount;
-      return acc;
-    },
-    {
-      totalClub: 0,
-      totalMEG: 0,
-      totalFacturacion: 0,
-      totalCash: 0,
-      totalLlamadasAgendadas: 0,
-      totalLlamadasEfectuadas: 0,
-      totalAplica: 0,
-      totalNoAplica: 0,
-    }
-  );
+  const totals = rawGroupedData?.length
+    ? rawGroupedData.reduce(
+        (acc, item) => {
+          acc.totalClub += item["Venta CLUB"] || 0;
+          acc.totalMEG += item["Ofertas Ganadas MEG"] || 0;
+          acc.totalFacturacion += item.Facturacion || 0;
+          acc.totalCash += item["Cash Collected"] || 0;
+          acc.totalLlamadasAgendadas += item.llamadasAgendadas || 0;
+          acc.totalLlamadasEfectuadas += item.llamadasEfectuadas || 0;
+          acc.totalAplica += item.aplicaCount || 0;
+          acc.totalNoAplica += item.noAplicaCount || 0;
+          return acc;
+        },
+        {
+          totalClub: 0,
+          totalMEG: 0,
+          totalFacturacion: 0,
+          totalCash: 0,
+          totalLlamadasAgendadas: 0,
+          totalLlamadasEfectuadas: 0,
+          totalAplica: 0,
+          totalNoAplica: 0,
+        }
+      )
+    : {
+        totalClub: 0,
+        totalMEG: 0,
+        totalFacturacion: 0,
+        totalCash: 0,
+        totalLlamadasAgendadas: 0,
+        totalLlamadasEfectuadas: 0,
+        totalAplica: 0,
+        totalNoAplica: 0,
+      };
+
+
 
   return (
     <div className="bg-gray-100 min-h-screen p-4 md:p-6">
       {/* Filtros */}
-      <div className="flex flex-col md:flex-row justify-center items-center bg-white rounded-lg shadow-lg p-5 mb-5 gap-2">
-        {/* Categoría */}
-        <div className="w-full md:w-auto">
-          <label
-            htmlFor="category"
-            className="block text-gray-700 font-semibold mb-1"
-          >
-            Categoría
-          </label>
-          <select
-            id="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full md:w-48 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 shadow"
-          >
-            <option value="Club">Club</option>
-            <option value="MEG">MEG</option>
-          </select>
-        </div>
-
-        {/* Seleccionar Mes */}
-        <div className="w-full md:w-auto">
-          <label
-            htmlFor="month"
-            className="block text-gray-700 font-semibold mb-1"
-          >
-            Seleccionar Mes
-          </label>
-          <DatePicker
-            selected={selectedDate}
-            onChange={handleDateChange}
-            dateFormat="MM/yyyy"
-            showMonthYearPicker
-            className="w-full md:w-48 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 shadow"
-          />
-        </div>
-      </div>
+     
 
       {groupedData.length > 0 ? (
         <>
@@ -330,7 +311,43 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+          <div className="flex flex-col md:flex-row justify-center items-center bg-white rounded-lg shadow-lg p-5 mb-5 gap-2">
+        {/* Categoría */}
+        <div className="w-full md:w-auto">
+          <label
+            htmlFor="category"
+            className="block text-gray-700 font-semibold mb-1"
+          >
+            Categoría
+          </label>
+          <select
+            id="category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full md:w-48 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 shadow"
+          >
+            <option value="Club">Club</option>
+            <option value="MEG">MEG</option>
+          </select>
+        </div>
 
+        {/* Seleccionar Mes */}
+        <div className="w-full md:w-auto">
+          <label
+            htmlFor="month"
+            className="block text-gray-700 font-semibold mb-1"
+          >
+            Seleccionar Mes
+          </label>
+          <DatePicker
+            selected={selectedDate}
+            onChange={handleDateChange}
+            dateFormat="MM/yyyy"
+            showMonthYearPicker
+            className="w-full md:w-48 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 shadow"
+          />
+        </div>
+      </div>
           {/* Contenido principal: Gráficos y Ranking */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Gráfico de Ventas */}

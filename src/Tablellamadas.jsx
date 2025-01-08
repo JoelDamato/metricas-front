@@ -6,9 +6,12 @@ import "react-datepicker/dist/react-datepicker.css";
 
 export default function SalesMetricsTable() {
   const [monthlyData, setMonthlyData] = useState([]);
+  const [originalData, setOriginalData] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(null);
-  const [comparisonMonth, setComparisonMonth] = useState(null); // Tabla adicional para comparación
-  const [pendingDate, setPendingDate] = useState(null); // Fecha seleccionada para modificar la tabla de comparación
+  const [comparisonMonth, setComparisonMonth] = useState(null);
+  const [pendingDate, setPendingDate] = useState(null);
+  const [selectedCloser, setSelectedCloser] = useState("");
+  const [selectedOrigin, setSelectedOrigin] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,6 +24,7 @@ export default function SalesMetricsTable() {
       try {
         const response = await fetch(API_BASE_URL);
         const data = await response.json();
+        setOriginalData(data); // Guarda los datos originales para los filtros
         const processedData = processMonthlyData(data);
         setMonthlyData(processedData);
 
@@ -32,7 +36,7 @@ export default function SalesMetricsTable() {
             m.year === now.getFullYear()
         );
         setCurrentMonth(currentMonthData || processedData[0]);
-        setComparisonMonth(currentMonthData || processedData[0]); // Inicializa la comparación con el mes actual
+        setComparisonMonth(currentMonthData || processedData[0]);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -43,8 +47,35 @@ export default function SalesMetricsTable() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (originalData.length > 0) {
+      const filteredData = processMonthlyData(originalData);
+      setMonthlyData(filteredData);
+      const now = new Date();
+      const currentMonthData = filteredData.find(
+        (m) =>
+          m.month === now.toLocaleString("es-ES", { month: "long" }) &&
+          m.year === now.getFullYear()
+      );
+      setCurrentMonth(currentMonthData || filteredData[0]);
+    }
+  }, [selectedCloser, selectedOrigin]);
+
   const processMonthlyData = (data) => {
     const monthlyStats = data.reduce((acc, item) => {
+      // Excluir registros con "Closer" vacío o "Sin closer"
+      if (!item.Closer || item.Closer.trim() === "" ) {
+        return acc;
+      }
+
+      // Aplicar filtros de "Closer" y "Origen"
+      if (
+        (selectedCloser && item.Closer !== selectedCloser) ||
+        (selectedOrigin && item.Origen !== selectedOrigin)
+      ) {
+        return acc;
+      }
+
       const date = new Date(item["Fecha creada"]);
       const month = date.toLocaleString("es-ES", { month: "long" });
       const year = date.getFullYear();
@@ -98,8 +129,8 @@ export default function SalesMetricsTable() {
     );
 
     if (selectedMonthData) {
-      setComparisonMonth(selectedMonthData); // Actualiza la tabla de comparación con el nuevo mes
-      setPendingDate(null); // Limpia la fecha seleccionada
+      setComparisonMonth(selectedMonthData);
+      setPendingDate(null);
     } else {
       alert("No hay datos disponibles para el mes seleccionado.");
     }
@@ -163,6 +194,36 @@ export default function SalesMetricsTable() {
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-6">Comparación de Métricas Mensuales</h2>
+      <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
+      <select
+  value={selectedCloser || ""}
+  onChange={(e) => setSelectedCloser(e.target.value)}
+  className="p-2 border rounded-md"
+>
+  <option value="">Todos los Closer</option>
+  {[...new Set(originalData.map((item) => item.Closer))]
+    .filter((closer) => closer && closer !== "Sin closer") // Excluir "Sin closer"
+    .map((closer) => (
+      <option key={closer} value={closer}>
+        {closer}
+      </option>
+    ))}
+</select>
+
+
+        <select
+          value={selectedOrigin || ""}
+          onChange={(e) => setSelectedOrigin(e.target.value)}
+          className="p-2 border rounded-md"
+        >
+          <option value="">Todos las Llamadas</option>
+          {[...new Set(originalData.map((item) => item.Origen))].map((origin) => (
+            <option key={origin} value={origin}>
+              {origin}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="flex flex-wrap md:flex-nowrap gap-4">
         {renderMonthColumn(currentMonth, "Mes actual")}
         {renderMonthColumn(comparisonMonth, "Mes de comparación")}
