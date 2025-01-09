@@ -424,14 +424,17 @@ const Dashboard = () => {
 
   {/* Tabla de Ranking */}
   <div className="bg-white rounded-lg shadow p-4 md:col-span-3">
-    <h3 className="text-base md:text-lg font-semibold text-gray-700 text-center mb-4">
-      Ranking
-    </h3>
+  <h3 className="text-base md:text-lg font-semibold text-gray-700 text-center mb-4">
+    Ranking
+  </h3>
+  <div className="overflow-x-auto">
     <table className="w-full table-auto border-collapse">
       <thead>
         <tr className="bg-gray-200">
           <th className="py-2 px-4 text-center text-sm">#</th>
-          <th className="py-2 px-4 text-left text-sm whitespace-nowrap">Closer</th>
+          <th className="py-2 px-4 text-left text-sm whitespace-nowrap">
+            Closer
+          </th>
           <th className="py-2 px-4 text-center text-sm whitespace-nowrap">
             {category === "Club" ? "Ventas Club" : "Ofertas Ganadas MEG"}
           </th>
@@ -452,6 +455,8 @@ const Dashboard = () => {
       </tbody>
     </table>
   </div>
+</div>
+
 
   {/* Gráfico de Facturación */}
   <div className="bg-white rounded-lg shadow p-4 md:col-span-1">
