@@ -16,6 +16,7 @@ const Dashboard = () => {
   const [selectedCloser, setSelectedCloser] = useState(null);
   const [groupedData, setGroupedData] = useState([]); // Estado para ranking
   const [rawGroupedData, setRawGroupedData] = useState([]); // Estado para todos los datos agrupados
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const API_BASE_URL =
@@ -23,6 +24,7 @@ const Dashboard = () => {
         ? "https://metricas-back.onrender.com/notion-data"
         : "http://localhost:3000/notion-data";
 
+    setIsLoading(true); // Inicia la carga
     fetch(API_BASE_URL)
       .then((response) => {
         if (!response.ok) {
@@ -37,13 +39,16 @@ const Dashboard = () => {
           setData([jsonData]);
         }
       })
-      .catch((error) => console.error("Error fetching data:", error));
+      .catch((error) => console.error("Error fetching data:", error))
+      .finally(() => setIsLoading(false)); // Finaliza la carga
   }, []);
 
   useEffect(() => {
-    filterAndGroupData(selectedDate);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+    if (!isLoading) {
+      filterAndGroupData(selectedDate);
+    }
+  }, [data, isLoading]);
+
 
   const filterAndGroupData = (date) => {
     const month = date.getMonth() + 1;
@@ -121,27 +126,70 @@ const Dashboard = () => {
 
   const getRanking = (key1, key2) => {
     return [...groupedData]
-      .sort((a, b) => b[key1] - a[key1])
-      .map((item, index) => (
-        <tr
-          key={item.Closer}
-          className="border-b cursor-pointer hover:bg-gray-100"
-          onClick={() => handleCloserClick(item.Closer)}
-        >
-          <td className="py-2 px-4 text-center">{index + 1}</td>
-          <td className="py-2 px-4">{item.Closer}</td>
-          <td className="py-2 px-4 text-center">{item[key1]}</td>
-          <td className="py-2 px-4 text-center">{item[key2]}</td>
-        </tr>
-      ));
+      .sort((a, b) => b[key1] - a[key1]) // Ordenar por ventas clave
+      .map((item, index) => {
+        let relevantFacturacion = 0;
+        let relevantCashCollected = 0;
+        let percentage = 0;
+  
+        if (category === "Club") {
+          // Para la categoría "Club"
+          relevantFacturacion = item["Venta CLUB"] === 0 ? 0 : item.Facturacion;
+        } else if (category === "MEG") {
+          // Para la categoría "MEG"
+          relevantFacturacion =
+            item["Ofertas Ganadas MEG"] === 0 ? 0 : item.Facturacion;
+  
+          // Asegurar que solo se tome el Cash Collected relevante para MEG
+          relevantCashCollected =
+            item["Ofertas Ganadas MEG"] === 0 ? 0 : item["Cash Collected"];
+  
+          // Calcular porcentaje solo si Facturación es mayor a 0
+          percentage =
+            relevantFacturacion > 0
+              ? ((relevantCashCollected / relevantFacturacion) * 100).toFixed(2)
+              : 0;
+        }
+  
+        return (
+          <tr
+            key={item.Closer}
+            className="border-b cursor-pointer hover:bg-gray-100"
+            onClick={() => handleCloserClick(item.Closer)}
+          >
+            <td className="py-2 px-4 text-center">{index + 1}</td>
+            <td className="py-2 px-4">{item.Closer}</td>
+            <td className="py-2 px-4 text-center">{item[key1]}</td>
+            <td className="py-2 px-4 text-center">{relevantFacturacion}</td>
+            {category === "MEG" && (
+              <>
+                <td className="py-2 px-4 text-center">{relevantCashCollected}</td>
+                <td className="py-2 px-4 text-center">{percentage}%</td>
+              </>
+            )}
+          </tr>
+        );
+      });
   };
-
   const generatePieChartData = (key) => {
+    // Filtrar los datos según la categoría seleccionada
+    const filteredData = groupedData.filter((item) => {
+      if (category === "Club") {
+        return item["Venta CLUB"] > 0; // Incluir solo datos relevantes para Club
+      } else if (category === "MEG") {
+        return item["Ofertas Ganadas MEG"] > 0; // Incluir solo datos relevantes para MEG
+      }
+      return false;
+    });
+  
+    // Mapear los datos filtrados para el gráfico
+    const dataForCategory = filteredData.map((item) => item[key]);
+  
     return {
-      labels: groupedData.map((item) => item.Closer),
+      labels: filteredData.map((item) => item.Closer), // Etiquetas solo de datos filtrados
       datasets: [
         {
-          data: groupedData.map((item) => item[key]),
+          data: dataForCategory, // Datos ajustados según la categoría
           backgroundColor: [
             "#FF6384",
             "#36A2EB",
@@ -154,7 +202,8 @@ const Dashboard = () => {
       ],
     };
   };
-
+  
+  
   const pieChartOptions = {
     plugins: {
       legend: {
@@ -222,7 +271,13 @@ const Dashboard = () => {
   return (
     <div className="bg-gray-100 min-h-screen p-4 md:p-6">
       {/* Filtros */}
-     
+      {isLoading ? (
+      <div className="flex justify-center items-center h-screen">
+        {/* Spinner con Tailwind */}
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500"></div>
+      </div>
+    ) : ("")}
+
 
       {groupedData.length > 0 ? (
         <>
@@ -348,67 +403,73 @@ const Dashboard = () => {
           />
         </div>
       </div>
-          {/* Contenido principal: Gráficos y Ranking */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Gráfico de Ventas */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-base md:text-lg font-semibold text-gray-700 text-center mb-4">
-                {category === "Club" ? "Venta CLUB" : "Ofertas Ganadas MEG"}
-              </h3>
-              <div className="relative h-56 md:h-64">
-                <Pie
-                  data={generatePieChartData(
-                    category === "Club" ? "Venta CLUB" : "Ofertas Ganadas MEG"
-                  )}
-                  options={pieChartOptions}
-                />
-              </div>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+  {/* Gráfico de Ventas */}
+  <div className="bg-white rounded-lg shadow p-4 md:col-span-1">
+    <h3 className="text-base md:text-lg font-semibold text-gray-700 text-center mb-4">
+      {category === "Club" ? "Venta CLUB" : "Ofertas Ganadas MEG"}
+    </h3>
+    <div className="relative h-48 w-full">
+      <Pie
+        data={generatePieChartData(
+          category === "Club" ? "Venta CLUB" : "Ofertas Ganadas MEG"
+        )}
+        options={{
+          ...pieChartOptions,
+          maintainAspectRatio: false,
+        }}
+      />
+    </div>
+  </div>
 
-            {/* Tabla de Ranking */}
-            <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">
-              <h3 className="text-base md:text-lg font-semibold text-gray-700 text-center mb-4">
-                Ranking
-              </h3>
-              <table className="w-full table-auto border-collapse">
-                <thead>
-                  <tr className="bg-gray-200">
-                    <th className="py-2 px-4 text-center">#</th>
-                    <th className="py-2 px-4 text-left">Closer</th>
-                    <th className="py-2 px-4 text-center">
-                      {category === "Club"
-                        ? "Ventas Club"
-                        : "Ofertas Ganadas MEG"}
-                    </th>
-                    <th className="py-2 px-4 text-center">
-                      {category === "Club" ? "Facturación" : "Cash Collected"}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getRanking(
-                    category === "Club" ? "Venta CLUB" : "Ofertas Ganadas MEG",
-                    category === "Club" ? "Facturacion" : "Cash Collected"
-                  )}
-                </tbody>
-              </table>
-            </div>
+  {/* Tabla de Ranking */}
+  <div className="bg-white rounded-lg shadow p-4 md:col-span-3">
+    <h3 className="text-base md:text-lg font-semibold text-gray-700 text-center mb-4">
+      Ranking
+    </h3>
+    <table className="w-full table-auto border-collapse">
+      <thead>
+        <tr className="bg-gray-200">
+          <th className="py-2 px-4 text-center text-sm">#</th>
+          <th className="py-2 px-4 text-left text-sm whitespace-nowrap">Closer</th>
+          <th className="py-2 px-4 text-center text-sm whitespace-nowrap">
+            {category === "Club" ? "Ventas Club" : "Ofertas Ganadas MEG"}
+          </th>
+          <th className="py-2 px-4 text-center text-sm">Facturación</th>
+          {category === "MEG" && (
+            <>
+              <th className="py-2 px-4 text-center text-sm">Cash Collected</th>
+              <th className="py-2 px-4 text-center text-sm">%</th>
+            </>
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        {getRanking(
+          category === "Club" ? "Venta CLUB" : "Ofertas Ganadas MEG",
+          category === "Club" ? "Facturacion" : "Cash Collected"
+        )}
+      </tbody>
+    </table>
+  </div>
 
-            {/* Gráfico de Facturación */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-base md:text-lg font-semibold text-gray-700 text-center mb-4">
-                Facturación
-              </h3>
-              <div className="relative h-56 md:h-64">
-                <Pie
-                  data={generatePieChartData(
-                    category === "Club" ? "Facturacion" : "Cash Collected"
-                  )}
-                  options={pieChartOptions}
-                />
-              </div>
-            </div>
-          </div>
+  {/* Gráfico de Facturación */}
+  <div className="bg-white rounded-lg shadow p-4 md:col-span-1">
+    <h3 className="text-base md:text-lg font-semibold text-gray-700 text-center mb-4">
+      Facturación
+    </h3>
+    <div className="relative h-48 w-full">
+      <Pie
+        data={generatePieChartData("Facturacion")}
+        options={{
+          ...pieChartOptions,
+          maintainAspectRatio: false,
+        }}
+      />
+    </div>
+  </div>
+</div>
+
         </>
       ) : (
         <p className="text-gray-600 text-center mt-12">
