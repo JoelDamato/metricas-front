@@ -20,10 +20,8 @@ export default function SalesMetricsChart() {
     "Llamadas Aplicables",
     "Llamadas Agendadas",
     "Llamadas Efectuadas",
-    "% Vendidas",
-    "Venta CLUB",
     "Venta en llamada",
-    "Facturacion",
+
   ]
 
   useEffect(() => {

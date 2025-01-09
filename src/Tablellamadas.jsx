@@ -95,7 +95,8 @@ export default function SalesMetricsTable() {
       acc[key].llamadasAgendadas += item["Llamadas Agendadas"] || 0;
       acc[key].llamadasAplicables += item["Llamadas Aplicables"] || 0;
       acc[key].llamadasEfectuadas += item["Llamadas Efectuadas"] || 0;
-      acc[key].llamadasVendidas += item["% Vendidas"] || 0;
+      acc[key].llamadasVendidas += item["Ofertas Ganadas MEG"] || 0;
+
 
       return acc;
     }, {});
