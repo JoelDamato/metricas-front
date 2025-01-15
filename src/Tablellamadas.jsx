@@ -1,42 +1,33 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
 export default function SalesMetricsTable() {
+  const API_BASE_URL =
+    process.env.NODE_ENV === "production"
+      ? "https://metricas-back.onrender.com/data"
+      : "http://localhost:3000/data";
+
   const [monthlyData, setMonthlyData] = useState([]);
   const [originalData, setOriginalData] = useState([]);
-  const [currentMonth, setCurrentMonth] = useState(null);
-  const [comparisonMonth, setComparisonMonth] = useState(null);
-  const [pendingDate, setPendingDate] = useState(null);
   const [selectedCloser, setSelectedCloser] = useState("");
   const [selectedOrigin, setSelectedOrigin] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const API_BASE_URL =
-      process.env.NODE_ENV === "production"
-        ? "https://metricas-back.onrender.com/notion-data"
-        : "http://localhost:3000/notion-data";
-
     const fetchData = async () => {
       try {
         const response = await fetch(API_BASE_URL);
-        const data = await response.json();
-        setOriginalData(data); // Guarda los datos originales para los filtros
-        const processedData = processMonthlyData(data);
-        setMonthlyData(processedData);
+        const result = await response.json();
 
-        // Set current month as default
-        const now = new Date();
-        const currentMonthData = processedData.find(
-          (m) =>
-            m.month === now.toLocaleString("es-ES", { month: "long" }) &&
-            m.year === now.getFullYear()
-        );
-        setCurrentMonth(currentMonthData || processedData[0]);
-        setComparisonMonth(currentMonthData || processedData[0]);
+        // Combina todos los lotes en un único array
+        const combinedData = result.data.flat();
+        console.log("Datos combinados:", combinedData);
+
+        setOriginalData(combinedData);
+        const processedData = processMonthlyData(combinedData);
+        setMonthlyData(processedData);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -45,38 +36,34 @@ export default function SalesMetricsTable() {
     };
 
     fetchData();
-  }, []);
-
-  useEffect(() => {
-    if (originalData.length > 0) {
-      const filteredData = processMonthlyData(originalData);
-      setMonthlyData(filteredData);
-      const now = new Date();
-      const currentMonthData = filteredData.find(
-        (m) =>
-          m.month === now.toLocaleString("es-ES", { month: "long" }) &&
-          m.year === now.getFullYear()
-      );
-      setCurrentMonth(currentMonthData || filteredData[0]);
-    }
-  }, [selectedCloser, selectedOrigin]);
+  }, [API_BASE_URL, selectedCloser, selectedOrigin]);
 
   const processMonthlyData = (data) => {
-    const monthlyStats = data.reduce((acc, item) => {
-      // Excluir registros con "Closer" vacío o "Sin closer"
-      if (!item.Closer || item.Closer.trim() === "" ) {
-        return acc;
-      }
+    const parseDate = (dateString) => {
+      // Extraer día, mes y año del formato "DD/MM/YY HH:mm"
+      const [datePart] = dateString.split(" "); // Separar la fecha de la hora
+      const [day, month, year] = datePart.split("/").map(Number);
 
-      // Aplicar filtros de "Closer" y "Origen"
+      // Crear un objeto Date con el formato correcto
+      return new Date(2000 + year, month - 1, day); // Ajustar el año y el mes (base 0)
+    };
+
+    const monthlyStats = data.reduce((acc, item) => {
       if (
-        (selectedCloser && item.Closer !== selectedCloser) ||
+        (selectedCloser && item["Closer Actual"] !== selectedCloser) ||
         (selectedOrigin && item.Origen !== selectedOrigin)
       ) {
         return acc;
       }
 
-      const date = new Date(item["Fecha creada"]);
+      const dateString = item["Fecha creada "];
+      const date = dateString ? parseDate(dateString) : null;
+
+      if (!date) {
+        console.log("Registro con fecha inválida:", item);
+        return acc;
+      }
+
       const month = date.toLocaleString("es-ES", { month: "long" });
       const year = date.getFullYear();
       const key = `${month}-${year}`;
@@ -92,11 +79,10 @@ export default function SalesMetricsTable() {
         };
       }
 
-      acc[key].llamadasAgendadas += item["Llamadas Agendadas"] || 0;
-      acc[key].llamadasAplicables += item["Llamadas Aplicables"] || 0;
-      acc[key].llamadasEfectuadas += item["Llamadas Efectuadas"] || 0;
-      acc[key].llamadasVendidas += item["Ofertas Ganadas MEG"] || 0;
-
+      acc[key].llamadasAgendadas += item["Llamadas agendadas"] || 0;
+      acc[key].llamadasAplicables += item["Llamadas aplicables"] || 0;
+      acc[key].llamadasEfectuadas += item["Llamadas efectuadas"] || 0;
+      acc[key].llamadasVendidas += item["Ofertas ganadas"] || 0;
 
       return acc;
     }, {});
@@ -116,134 +102,107 @@ export default function SalesMetricsTable() {
     }));
   };
 
-  const handleDateChange = (date) => {
-    setPendingDate(date);
-  };
-
-  const updateComparison = () => {
-    if (!pendingDate) return;
-
-    const selectedMonthData = monthlyData.find(
-      (m) =>
-        m.month === pendingDate.toLocaleString("es-ES", { month: "long" }) &&
-        m.year === pendingDate.getFullYear()
-    );
-
-    if (selectedMonthData) {
-      setComparisonMonth(selectedMonthData);
-      setPendingDate(null);
-    } else {
-      alert("No hay datos disponibles para el mes seleccionado.");
-    }
-  };
-
-  const renderMonthColumn = (data, title) => {
+  const renderMonthlyTables = () => {
     return (
-      <div className="w-full md:w-1/3 p-2">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold mb-2">{title}</h3>
-        </div>
-        {data ? (
-          <table className="w-full bg-white rounded-lg shadow text-sm">
-            <tbody>
-              <tr>
-                <td className="p-2 border-b font-medium">Llamadas Agendadas</td>
-                <td className="p-2 border-b text-center bg-cyan-100">
-                  {data.llamadasAgendadas}
-                </td>
-              </tr>
-              <tr>
-                <td className="p-2 border-b font-medium">Llamadas Aplicables</td>
-                <td className="p-2 border-b text-center bg-green-50">
-                  {data.llamadasAplicables}
-                </td>
-                <td className="p-2 border-b text-center bg-green-50">
-                  {data.llamadasAplicablesPercent.toFixed(1)}%
-                </td>
-              </tr>
-              <tr>
-                <td className="p-2 border-b font-medium">Llamadas Efectuadas</td>
-                <td className="p-2 border-b text-center bg-green-50">
-                  {data.llamadasEfectuadas}
-                </td>
-                <td className="p-2 border-b text-center bg-green-50">
-                  {data.llamadasEfectuadasPercent.toFixed(1)}%
-                </td>
-              </tr>
-              <tr>
-                <td className="p-2 border-b font-medium">Llamadas Vendidas</td>
-                <td className="p-2 border-b text-center bg-green-50">
-                  {data.llamadasVendidas}
-                </td>
-                <td className="p-2 border-b text-center bg-green-50">
-                  {data.llamadasVendidasPercent.toFixed(1)}%
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <p className="text-gray-500">Sin datos disponibles</p>
-        )}
+      <div className="flex flex-wrap gap-4">
+        {monthlyData.map((data, index) => (
+          <div
+            key={index}
+            className="w-full md:w-1/3 bg-white rounded-lg shadow p-4 text-sm relative"
+          >
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-blue-500"></div>
+              </div>
+            )}
+            <h3 className="text-lg font-semibold mb-2 text-center">
+              {`${data.month} ${data.year}`}
+            </h3>
+            <table className="w-full">
+              <tbody>
+                <tr>
+                  <td className="p-2 border-b font-medium">Llamadas Agendadas</td>
+                  <td className="p-2 border-b text-center">
+                    {data.llamadasAgendadas}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="p-2 border-b font-medium">Llamadas Aplicables</td>
+                  <td className="p-2 border-b text-center">
+                    {data.llamadasAplicables}
+                  </td>
+                  <td className="p-2 border-b text-center">
+                    {data.llamadasAplicablesPercent.toFixed(1)}%
+                  </td>
+                </tr>
+                <tr>
+                  <td className="p-2 border-b font-medium">Llamadas Efectuadas</td>
+                  <td className="p-2 border-b text-center">
+                    {data.llamadasEfectuadas}
+                  </td>
+                  <td className="p-2 border-b text-center">
+                    {data.llamadasEfectuadasPercent.toFixed(1)}%
+                  </td>
+                </tr>
+                <tr>
+                  <td className="p-2 border-b font-medium">Llamadas Vendidas</td>
+                  <td className="p-2 border-b text-center">
+                    {data.llamadasVendidas}
+                  </td>
+                  <td className="p-2 border-b text-center">
+                    {data.llamadasVendidasPercent.toFixed(1)}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ))}
       </div>
     );
   };
 
-  if (isLoading) {
-    return <div className="text-center p-4">Cargando datos...</div>;
-  }
+  const handleSelectChange = (setter) => (event) => {
+    const value = event.target.value;
+    setter(value);
+    setIsLoading(true);
+    console.log(`Cambio detectado: ${value}`);
+  };
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-6">Comparación de Métricas Mensuales</h2>
+      <h2 className="text-2xl font-bold mb-6">Métricas Mensuales</h2>
       <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
-      <select
-  value={selectedCloser || ""}
-  onChange={(e) => setSelectedCloser(e.target.value)}
-  className="p-2 border rounded-md"
->
-  <option value="">Todas las llamadas</option>
-  {[...new Set(originalData.map((item) => item.Closer))]
-    .filter((closer) => closer && closer !== "Sin closer") // Excluir "Sin closer"
-    .map((closer) => (
-      <option key={closer} value={closer}>
-        {closer}
-      </option>
-    ))}
-</select>
-
+        <select
+          value={selectedCloser || ""}
+          onChange={handleSelectChange(setSelectedCloser)}
+          className="p-2 border rounded-md"
+        >
+          <option value="">Todos los Closers</option>
+          {[...new Set(originalData.map((item) => item["Closer Actual"]))]
+            .filter((closer) => closer && closer !== "Sin closer")
+            .map((closer) => (
+              <option key={closer} value={closer}>
+                {closer}
+              </option>
+            ))}
+        </select>
 
         <select
           value={selectedOrigin || ""}
-          onChange={(e) => setSelectedOrigin(e.target.value)}
+          onChange={handleSelectChange(setSelectedOrigin)}
           className="p-2 border rounded-md"
         >
           <option value="">Todos los Orígenes</option>
-          {[...new Set(originalData.map((item) => item.Origen))].map((origin) => (
-            <option key={origin} value={origin}>
-              {origin}
-            </option>
-          ))}
+          {[...new Set(originalData.map((item) => item.Origen))]
+            .filter(Boolean)
+            .map((origin) => (
+              <option key={origin} value={origin}>
+                {origin}
+              </option>
+            ))}
         </select>
       </div>
-      <div className="flex flex-wrap md:flex-nowrap gap-4">
-        {renderMonthColumn(currentMonth, "Mes actual")}
-        {renderMonthColumn(comparisonMonth, "Mes de comparación")}
-      </div>
-      <div className="mt-6 flex flex-col md:flex-row gap-4 items-center">
-        <DatePicker
-          selected={pendingDate}
-          onChange={handleDateChange}
-          dateFormat="MMMM yyyy"
-          showMonthYearPicker
-          className="p-2 border rounded-md"
-        />
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-          onClick={updateComparison}
-        >
-          Actualizar Comparación
-        </button>
-      </div>
+      {renderMonthlyTables()}
     </div>
   );
 }
