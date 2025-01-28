@@ -20,7 +20,7 @@ export default function SalesMetricsChart() {
     "Llamadas aplicables",
     "Llamadas agendadas",
     "Llamadas efectuadas",
-    "Ofertas ganadas",
+    "Venta Meg",
   ];
 
   useEffect(() => {
@@ -39,20 +39,20 @@ export default function SalesMetricsChart() {
           },
         });
 
-        console.log("Response Status:", response.status);
+
 
         if (!response.ok) {
           const errorData = await response.json();
-          console.error("Error en la respuesta:", errorData);
+
           throw new Error(`Error ${response.status}: ${errorData.msg || response.statusText}`);
         }
 
         const result = await response.json();
-        console.log("Datos recibidos del endpoint:", result);
+
 
         // Aplanar los datos si vienen en fragmentos
         const flatData = Array.isArray(result) ? result.flat() : result.data || [];
-        console.log("Datos aplanados:", flatData);
+
 
         const validData = flatData.map((item) => {
           const dateString = item["Fecha creada "];
@@ -69,7 +69,7 @@ export default function SalesMetricsChart() {
           };
         });
 
-        console.log("Datos procesados:", validData);
+ 
         setOriginalData(validData.filter((item) => item["Fecha creada"]));
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -82,16 +82,15 @@ export default function SalesMetricsChart() {
   }, []);
 
   const origins = [...new Set(originalData.map((d) => d.Origen))].filter(Boolean);
-  console.log("Orígenes disponibles:", origins);
+
 
   const employees = [...new Set(originalData.map((d) => d["Closer Actual"]).filter(Boolean))];
 
-  console.log("Closers disponibles:", employees);
+
 
   useEffect(() => {
     if (selectedMetrics.length === 0) return;
 
-    console.log("Original Data antes de filtrar:", originalData);
 
     const filtered = originalData.filter((item) => {
       const date = item["Fecha creada"];
@@ -104,7 +103,7 @@ export default function SalesMetricsChart() {
       return matchesDate && matchesOrigin && matchesEmployee;
     });
 
-    console.log("Datos filtrados:", filtered);
+
     setFilteredData(filtered);
     updateChart(filtered);
   }, [startDate, endDate, selectedMetrics, selectedEmployees, selectedOrigin, targetValue, originalData]);
@@ -148,7 +147,7 @@ export default function SalesMetricsChart() {
   
   const updateChart = (data) => {
     const groupedData = processDailyData(data);
-    console.log("Datos agrupados por día:", groupedData);
+  
   
     const labels = Object.keys(groupedData).sort((a, b) => {
       const [dayA, monthA, yearA] = a.split("/").map(Number);
@@ -156,7 +155,7 @@ export default function SalesMetricsChart() {
       return new Date(yearA, monthA - 1, dayA) - new Date(yearB, monthB - 1, dayB);
     });
   
-    console.log("Etiquetas del gráfico (días):", labels);
+
   
     const datasets = selectedMetrics.map((metric, index) => ({
       label: metric,
@@ -191,7 +190,7 @@ export default function SalesMetricsChart() {
       });
     }
   
-    console.log("Datasets para el gráfico:", datasets);
+
   
     const ctx = chartRef.current.getContext("2d");
     if (chartInstance.current) chartInstance.current.destroy();
