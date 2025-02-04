@@ -56,7 +56,7 @@ const Dashboard = () => {
 
               acc[monthKey].entries.push({
                 closer: curr["Responsable"]?.trim() || "Desconocido",
-                cashCollected: parseFloat(curr["Cash Collected"] || 0),
+                cashCollected: parseFloat(curr["Cash collected total"] || 0),
                 offersWon: parseInt(curr["Venta Meg"] || 0),
                 facturacion: parseFloat(curr["Precio"] || 0),
               });

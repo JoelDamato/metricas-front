@@ -55,7 +55,7 @@ export default function SalesMetricsChart() {
 
 
         const validData = flatData.map((item) => {
-          const dateString = item["Fecha creada "];
+          const dateString = item["Fecha correspondiente "];
           const parseDate = (dateString) => {
             if (!dateString) return null;
             const [datePart] = dateString.split(" ");
@@ -70,7 +70,7 @@ export default function SalesMetricsChart() {
         });
 
  
-        setOriginalData(validData.filter((item) => item["Fecha creada"]));
+        setOriginalData(validData.filter((item) => item["Fecha correspondiente"]));
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -84,7 +84,7 @@ export default function SalesMetricsChart() {
   const origins = [...new Set(originalData.map((d) => d.Origen))].filter(Boolean);
 
 
-  const employees = [...new Set(originalData.map((d) => d["Closer Actual"]).filter(Boolean))];
+  const employees = [...new Set(originalData.map((d) => d["Responsable"]).filter(Boolean))];
 
 
 
@@ -93,11 +93,11 @@ export default function SalesMetricsChart() {
 
 
     const filtered = originalData.filter((item) => {
-      const date = item["Fecha creada"];
+      const date = item["Fecha correspondiente"];
       const matchesDate = date >= new Date(startDate) && date <= new Date(endDate);
       const matchesOrigin = selectedOrigin ? item.Origen === selectedOrigin : true;
       const matchesEmployee = selectedEmployees.length
-        ? selectedEmployees.includes(item["Closer Actual"])
+        ? selectedEmployees.includes(item["Responsable"])
         : true;
 
       return matchesDate && matchesOrigin && matchesEmployee;
@@ -110,7 +110,7 @@ export default function SalesMetricsChart() {
 
   const processDailyData = (data) => {
     return data.reduce((acc, item) => {
-      const date = item["Fecha creada"];
+      const date = item["Fecha correspondiente"];
       if (!date) return acc;
   
       const day = `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
@@ -134,7 +134,7 @@ export default function SalesMetricsChart() {
         acc[day][metric] += item[metric] || 0;
         if (selectedEmployees.length) {
           selectedEmployees.forEach((employee) => {
-            if (item["Closer Actual"] === employee) {
+            if (item["Responsable"] === employee) {
               acc[day][`metric_${employee}`] += item[metric] || 0;
             }
           });

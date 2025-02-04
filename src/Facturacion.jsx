@@ -43,7 +43,7 @@ export default function CashMetricsChart() {
     if (selectedMetrics.length === 0) return;
 
     const filtered = originalData.filter((item) => {
-      const date = new Date(item["Fecha creada"]);
+      const date = new Date(item["Fecha correspondiente"]);
       const matchesEmployee =
         selectedEmployees.length === 0 ||
         selectedEmployees.includes(item.Closer) ||
@@ -58,7 +58,7 @@ export default function CashMetricsChart() {
     const grouped = {};
 
     data.forEach((item) => {
-      const dateObj = new Date(item["Fecha creada"]);
+      const dateObj = new Date(item["Fecha correspondiente"]);
       const day = `${dateObj.getDate().toString().padStart(2, "0")}/${(dateObj.getMonth() + 1)
         .toString()
         .padStart(2, "0")}/${dateObj.getFullYear()}`;
