@@ -8,7 +8,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-gray-800 text-white">
+    <nav className="bg-black text-white">
       <div className="container mx-auto flex justify-between items-center py-4 px-6">
         {/* Logo */}
         <div className="text-2xl font-bold hover:text-blue-400">
@@ -21,14 +21,37 @@ const Navbar = () => {
             onClick={toggleDropdown}
             className="text-2xl font-bold hover:text-blue-400 focus:outline-none"
           >
-            Panel de Métricas
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth="1.5"
+              stroke="currentColor"
+              className="w-6 h-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+              />
+            </svg>
           </button>
 
           {/* Menú desplegable */}
           {isDropdownOpen && (
-            <ul className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg">
-                <li>
+            <ul
+              className={`absolute top-full right-0 w-full bg-black/90 shadow-lg z-50 
+                transition-transform duration-300 ease-in-out transform 
+                ${
+                  isDropdownOpen
+                    ? 'translate-y-0 opacity-100'
+                    : '-translate-y-2 opacity-0'
+                }
+                md:w-48 md:right-0 md:top-12`}
+            >
+              <li>
                 <a
+                  onClick={toggleDropdown}
                   href="/"
                   className="block px-4 py-2 hover:bg-gray-600 transition duration-300"
                 >
@@ -37,29 +60,13 @@ const Navbar = () => {
               </li>
               <li>
                 <a
-                  href="/facturacion"
-                  className="block px-4 py-2 hover:bg-gray-600 transition duration-300"
-                >
-                  Facturación
-                </a>
-              </li>
-              <li>
-                <a
+                  onClick={toggleDropdown}
                   href="/llamadas"
                   className="block px-4 py-2 hover:bg-gray-600 transition duration-300"
                 >
                   Llamadas
                 </a>
               </li>
-              <li>
-                <a
-                  href="/Interacciones"
-                  className="block px-4 py-2 hover:bg-gray-600 transition duration-300"
-                >
-                  Interacciones
-                </a>
-              </li>
-            
             </ul>
           )}
         </div>
