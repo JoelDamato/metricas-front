@@ -100,13 +100,14 @@ const DashboardTable = () => {
       </div>
       {closerFilter && totals[closerFilter] ? (
         <div className="w-full max-w-6xl mx-auto overflow-x-auto">
-          <table className="w-full bg-white shadow-md rounded-lg overflow-x-auto">
+          <table className="w-full min-w-[700px] max-w-full bg-white shadow-md rounded-lg">
             <tbody>
               <tr className="bg-gray-200">
-                <td className="p-3 font-bold text-gray-700 w-1/4">Closer</td>
-                <td className="p-3 text-gray-600 w-1/6">Actual</td>
-                <td className="p-3 text-gray-600 w-1/6">Objetivo</td>
-                <td className="p-3 text-gray-600 w-1/6">Base</td>
+                <td className="p-3 font-bold text-gray-700">Closer</td>
+                <td className="p-3 text-gray-600">{closerFilter}</td>
+                <td className="p-3 text-gray-600">Actual</td>
+                <td className="p-3 text-gray-600">Objetivo</td>
+                <td className="p-3 text-gray-600">Base</td>
               </tr>
               {Object.entries(totals[closerFilter])
                 .filter(([key]) => key !== "percentages")
@@ -114,18 +115,19 @@ const DashboardTable = () => {
                   <tr key={key} className="border-b">
                     <td className="p-3 font-bold text-gray-700">{key}</td>
                     <td className="p-3 text-gray-600">{typeof value === 'object' ? '' : value}</td>
-                    <td className="p-3 w-1/6">
+                    <td className="p-3 text-gray-600">{totals[closerFilter].percentages[key] || "-"}</td>
+                    <td className="p-3">
                       <input
                         type="text"
-                        className="border p-2 w-full min-w-[100px] max-w-[150px] rounded"
+                        className="border p-2 w-full rounded"
                         value={inputs[closerFilter]?.[key]?.objetivo || ""}
                         onChange={(e) => handleInputChange(closerFilter, key, { ...inputs[closerFilter]?.[key], objetivo: e.target.value })}
                       />
                     </td>
-                    <td className="p-3 w-1/6">
+                    <td className="p-3">
                       <input
                         type="text"
-                        className="border p-2 w-full min-w-[100px] max-w-[150px] rounded"
+                        className="border p-2 w-full rounded"
                         value={inputs[closerFilter]?.[key]?.base || ""}
                         onChange={(e) => handleInputChange(closerFilter, key, { ...inputs[closerFilter]?.[key], base: e.target.value })}
                       />
@@ -135,7 +137,6 @@ const DashboardTable = () => {
             </tbody>
           </table>
         </div>
-
       ) : (<p className="text-gray-500 mt-4">Seleccione un closer para ver los datos.</p>)}
     </div>
   );
