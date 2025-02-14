@@ -6,10 +6,10 @@ const Dashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_BASE_URL =
-    process.env.NODE_ENV === "production"
-      ? "https://metricas-back.onrender.com/llamadas"
-      : "http://localhost:3000/llamadas";
+  const API_BASE_URL = "https://metricas-back.onrender.com/llamadas"
+    // process.env.NODE_ENV === "production"
+    //   ? "https://metricas-back.onrender.com/llamadas"
+    //   : "http://localhost:3000/llamadas";
 
   const monthNames = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",

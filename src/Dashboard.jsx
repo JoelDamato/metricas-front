@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 const DashboardTable = () => {
-  const API_URL =
-    process.env.NODE_ENV === "production"
-      ? "https://metricas-back.onrender.com/dashboard"
-      : "http://localhost:3000/dashboard";
+  const API_URL = "https://metricas-back.onrender.com/dashboard"
+    // process.env.NODE_ENV === "production"
+    //   ? "https://metricas-back.onrender.com/dashboard"
+    //   : "http://localhost:3000/dashboard";
 
   const [data, setData] = useState([]);
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
@@ -27,11 +27,14 @@ const DashboardTable = () => {
     fetchData();
   }, []);
 
+  console.log(data);
+
   useEffect(() => {
     const filtered = data.filter((row) =>
-      new Date(row["Fecha correspondiente"]).toISOString().slice(0, 7) === monthFilter &&
-      (closerFilter ? row["Closer Actual"] === closerFilter : true)
-    );
+    row["Venta Club"] !== 1 && // Excluye si Venta Club es 1
+    new Date(row["Fecha correspondiente"]).toISOString().slice(0, 7) === monthFilter &&
+    (closerFilter ? row["Closer Actual"] === closerFilter : true)
+  );
 
     const groupedByCloser = {};
     
@@ -40,7 +43,7 @@ const DashboardTable = () => {
       if (!groupedByCloser[closer]) {
         groupedByCloser[closer] = {
           "Total Sales": 0,
-          "Ofertas ganadas": 0,
+          "Ofertas Ganadas": 0,
           "Cash collected": 0,
           "Agendas totales": 0,
           "Cerradas": 0,
@@ -53,11 +56,11 @@ const DashboardTable = () => {
         };
       }
       groupedByCloser[closer]["Total Sales"] += row["Precio"] || 0;
-      groupedByCloser[closer]["Ofertas ganadas"] += row["Venta MEG"] ? row["Venta MEG"] : 0;
+      groupedByCloser[closer]["Ofertas Ganadas"] += row["Venta Meg"] ? row["Venta Meg"] : 0;
       groupedByCloser[closer]["Cash collected"] += row["Cash collected total"] || 0;
       groupedByCloser[closer]["Agendas totales"] += row["Agenda"] || 0;
-      groupedByCloser[closer]["Cerradas"] += row["Venta MEG"] || 0;
-      groupedByCloser[closer]["Cierre/Asistencias"] += row["Venta MEG"] && row["Llamadas efectuadas"] ? 1 : 0;
+      groupedByCloser[closer]["Cerradas"] += row["Venta Meg"] || 0;
+      groupedByCloser[closer]["Cierre/Asistencias"] += row["Venta Meg"] && row["Llamadas efectuadas"] ? 1 : 0;
       groupedByCloser[closer]["Asistencia"] += row["Llamadas efectuadas"] || 0;
       groupedByCloser[closer]["Recuperado"] += row["Asistio?"]?.includes("Recuperado") ? 1 : 0;
       groupedByCloser[closer]["No asiste"] += (row["Agenda"] || 0) - (row["Llamadas efectuadas"] || 0);
