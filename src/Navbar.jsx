@@ -40,14 +40,9 @@ const Navbar = () => {
           {/* Menú desplegable */}
           {isDropdownOpen && (
             <ul
-              className={`absolute top-full right-0 w-full bg-black/90 shadow-lg z-50 
-                transition-transform duration-300 ease-in-out transform 
-                ${
-                  isDropdownOpen
-                    ? 'translate-y-0 opacity-100'
-                    : '-translate-y-2 opacity-0'
-                }
-                md:w-48 md:right-0 md:top-12`}
+              className={`absolute top-full right-0 w-48 bg-black/90 shadow-lg z-50
+            transition-transform duration-300 ease-in-out transform 
+            ${isDropdownOpen ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}
             >
               <li>
                 <a
