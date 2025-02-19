@@ -155,7 +155,7 @@ setAvailableOrigins(validOrigins);
     console.log("📩 Enviando al backend:", goalData);
   
     try {
-      const response = await fetch(`http://localhost:3000/update-goal`, {
+      const response = await fetch(`https://metricas-back.onrender.com/update-goal`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -178,7 +178,7 @@ setAvailableOrigins(validOrigins);
   useEffect(() => {
     const fetchGoals = async () => {
       try {
-        const response = await fetch("http://localhost:3000/goals");
+        const response = await fetch("hhttps://metricas-back.onrender.com/goals");
         const result = await response.json();
   
         // Formatear la respuesta para monthlyGoals
