@@ -178,7 +178,7 @@ setAvailableOrigins(validOrigins);
   useEffect(() => {
     const fetchGoals = async () => {
       try {
-        const response = await fetch("hhttps://metricas-back.onrender.com/goals");
+        const response = await fetch("https://metricas-back.onrender.com/goals");
         const result = await response.json();
   
         // Formatear la respuesta para monthlyGoals
