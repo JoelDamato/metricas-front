@@ -4,10 +4,10 @@ import { useEffect, useState } from "react"
 import "react-datepicker/dist/react-datepicker.css"
 
 export default function SalesMetricsTable() {
-  const API_BASE_URL =
-    process.env.NODE_ENV === "production"
-      ? "https://metricas-back.onrender.com/metricas"
-      : "http://localhost:3000/metricas"
+  const API_BASE_URL = "https://metricas-back.onrender.com/metricas"
+  // process.env.NODE_ENV === "production"
+  //   ? "https://metricas-back.onrender.com/metricas"
+  //   : "http://localhost:3000/metricas"
 
   const [monthlyData, setMonthlyData] = useState([])
   const [availableClosers, setAvailableClosers] = useState([])
@@ -24,96 +24,96 @@ export default function SalesMetricsTable() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading(true)
-        const response = await fetch(API_BASE_URL)
-        const result = await response.json()
-        console.log("Datos recibidos del backend:", result)
-
+        setIsLoading(true); 
+        const response = await fetch(API_BASE_URL);
+        const result = await response.json();
+        console.log("Datos recibidos del backend:", result);
+  
         // 🔥 Obtener el año actual
-        const currentYear = new Date().getFullYear()
-
+        const currentYear = new Date().getFullYear();
+  
         // 🔥 Filtrar solo los datos del año actual
         const filteredData = result.filter((item) => {
-          const dateString = item["Fecha correspondiente"]
-          const date = new Date(dateString)
-          return !isNaN(date) && date.getFullYear() === currentYear
-        })
-
+          const dateString = item["Fecha correspondiente"];
+          const date = new Date(dateString);
+          return !isNaN(date) && date.getFullYear() === currentYear;
+        });
+  
         // Aplicar filtro dinámico en el frontend
         const filteredByCloserAndOrigin = filteredData.filter((item) => {
-          const matchesCloser = selectedCloser ? item.Responsable === selectedCloser : true
-          const matchesOrigin = selectedOrigin ? item.Origen === selectedOrigin : true
-          return matchesCloser && matchesOrigin
-        })
-
+          const matchesCloser = selectedCloser ? item.Responsable === selectedCloser : true;
+          const matchesOrigin = selectedOrigin ? item.Origen === selectedOrigin : true;
+          return matchesCloser && matchesOrigin;
+        });
+  
         // Agrupar datos después del filtrado
         const groupDataByMonth = (data) => {
           // Primero, encontrar todos los meses de agendamiento para cada cliente
-          const clientScheduleMonths = {}
+          const clientScheduleMonths = {};
           data.forEach((item) => {
             if (item.Agenda === 1) {
-              const date = new Date(item["Fecha correspondiente"])
-              const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-              const clientName = item["Nombre cliente"]
-
+              const date = new Date(item["Fecha correspondiente"]);
+              const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+              const clientName = item["Nombre cliente"];
+  
               if (!clientScheduleMonths[clientName]) {
-                clientScheduleMonths[clientName] = []
+                clientScheduleMonths[clientName] = [];
               }
               clientScheduleMonths[clientName].push({
                 monthYear,
                 date: date.getTime(),
-              })
+              });
             }
-          })
-
+          });
+  
           // Ordenar los meses de agendamiento por fecha para cada cliente
           Object.keys(clientScheduleMonths).forEach((clientName) => {
-            clientScheduleMonths[clientName].sort((a, b) => a.date - b.date)
-          })
-
+            clientScheduleMonths[clientName].sort((a, b) => a.date - b.date);
+          });
+  
           // Initialize the accumulator object
-          const acc = {}
-
+          const acc = {};
+  
           // Modificar la estructura inicial de acc para incluir el nuevo campo
-
+  
           // Agrupar registros por cliente y período de agendamiento
-          const clientRecords = {}
-
+          const clientRecords = {};
+  
           // Primero, organizar todos los registros por cliente y período de agendamiento
           data.forEach((item) => {
-            const clientName = item["Nombre cliente"]
-            const itemDate = new Date(item["Fecha correspondiente"])
-            const itemTimestamp = itemDate.getTime()
-
+            const clientName = item["Nombre cliente"];
+            const itemDate = new Date(item["Fecha correspondiente"]);
+            const itemTimestamp = itemDate.getTime();
+  
             if (clientScheduleMonths[clientName]) {
               // Encontrar el período de agendamiento correspondiente
               const scheduleInfo = clientScheduleMonths[clientName].find((schedule, index) => {
-                const isLastSchedule = index === clientScheduleMonths[clientName].length - 1
-                const nextSchedule = !isLastSchedule ? clientScheduleMonths[clientName][index + 1] : null
-
+                const isLastSchedule = index === clientScheduleMonths[clientName].length - 1;
+                const nextSchedule = !isLastSchedule ? clientScheduleMonths[clientName][index + 1] : null;
+  
                 return isLastSchedule
                   ? itemTimestamp >= schedule.date
-                  : itemTimestamp >= schedule.date && itemTimestamp < nextSchedule.date
-              })
-
+                  : itemTimestamp >= schedule.date && itemTimestamp < nextSchedule.date;
+              });
+  
               if (scheduleInfo) {
-                const monthYear = scheduleInfo.monthYear
-
+                const monthYear = scheduleInfo.monthYear;
+  
                 if (!clientRecords[monthYear]) {
-                  clientRecords[monthYear] = {}
+                  clientRecords[monthYear] = {};
                 }
                 if (!clientRecords[monthYear][clientName]) {
-                  clientRecords[monthYear][clientName] = []
+                  clientRecords[monthYear][clientName] = [];
                 }
-
+  
                 clientRecords[monthYear][clientName].push({
                   ...item,
                   timestamp: itemTimestamp,
-                })
+                });
               }
             }
-          })
-
+          });
+  
           // Procesar los registros agrupados
           Object.entries(clientRecords).forEach(([monthYear, clients]) => {
             if (!acc[monthYear]) {
@@ -127,102 +127,117 @@ export default function SalesMetricsTable() {
                 ventasPorMes: {},
                 // Nuevo campo para rastrear los intervalos de venta
                 intervalosVenta: [],
-              }
+              };
             }
-
+  
             Object.entries(clients).forEach(([clientName, records]) => {
               // Ordenar registros por fecha
-              records.sort((a, b) => a.timestamp - b.timestamp)
-
+              records.sort((a, b) => a.timestamp - b.timestamp);
+  
               // Encontrar la primera fecha de agendamiento
-              const primerAgendamiento = records.find((record) => record.Agenda === 1)
-
+              const primerAgendamiento = records.find((record) => record.Agenda === 1);
+  
               // Encontrar la fecha de venta si existe
-              const registroVenta = records.find((record) => record["Venta Meg"] > 0)
-
+              const registroVenta = records.find((record) => record["Venta Meg"] > 0);
+  
               // Si hay tanto agendamiento como venta, calcular el intervalo
               if (primerAgendamiento && registroVenta) {
                 const diasIntervalo = Math.floor(
                   (new Date(registroVenta["Fecha correspondiente"]).getTime() -
                     new Date(primerAgendamiento["Fecha correspondiente"]).getTime()) /
-                    (1000 * 60 * 60 * 24),
-                )
-                acc[monthYear].intervalosVenta.push(diasIntervalo)
+                    (1000 * 60 * 60 * 24)
+                );
+                acc[monthYear].intervalosVenta.push(diasIntervalo);
               }
-
+  
               // Contar Agenda
-              const hasAgenda = records.some((record) => record.Agenda === 1)
+              const hasAgenda = records.some((record) => record.Agenda === 1);
               if (hasAgenda) {
-                acc[monthYear].Agenda += 1
+                acc[monthYear].Agenda += 1;
               }
-
+  
               // Para "Aplica?", usar solo el registro más reciente
-              const latestRecord = records[0]
+              const latestRecord = records[0];
               if (latestRecord["Aplica?"] === "Aplica") {
-                acc[monthYear]["Aplica?"] += 1
+                acc[monthYear]["Aplica?"] += 1;
               }
-
+  
               // Procesar el resto de métricas normalmente
               records.forEach((record) => {
-                acc[monthYear]["Llamadas efectuadas"] += record["Llamadas efectuadas"] || 0
-                acc[monthYear]["Venta Meg"] += record["Venta Meg"] || 0
-
+                acc[monthYear]["Llamadas efectuadas"] += record["Llamadas efectuadas"] || 0;
+                acc[monthYear]["Venta Meg"] += record["Venta Meg"] || 0;
+  
                 // Registrar ventas por mes
                 if (record["Venta Meg"] > 0) {
-                  const ventaDate = new Date(record["Fecha correspondiente"])
-                  const ventaMonthYear = `${ventaDate.getFullYear()}-${String(ventaDate.getMonth() + 1).padStart(2, "0")}`
-
+                  const ventaDate = new Date(record["Fecha correspondiente"]);
+                  const ventaMonthYear = `${ventaDate.getFullYear()}-${String(ventaDate.getMonth() + 1).padStart(2, "0")}`;
+  
                   if (!acc[monthYear].ventasPorMes[ventaMonthYear]) {
-                    acc[monthYear].ventasPorMes[ventaMonthYear] = 0
+                    acc[monthYear].ventasPorMes[ventaMonthYear] = 0;
                   }
-                  acc[monthYear].ventasPorMes[ventaMonthYear] += record["Venta Meg"]
+                  acc[monthYear].ventasPorMes[ventaMonthYear] += record["Venta Meg"];
                 }
-
+  
                 // Excluir "Venta Club": 1 en los cálculos
                 if (record["Venta Club"] !== 1) {
-                  acc[monthYear]["Monto"] += record["Precio"] || 0
-                  acc[monthYear]["Cash collected"] += record["Cash collected total"] || 0
+                  acc[monthYear]["Monto"] += record["Precio"] || 0;
+                  acc[monthYear]["Cash collected"] += record["Cash collected total"] || 0;
                 }
-              })
-            })
-          })
-
+              });
+            });
+          });
+  
           // Calcular el promedio de intervalos para cada mes
           Object.keys(acc).forEach((monthYear) => {
-            const intervalos = acc[monthYear].intervalosVenta
+            const intervalos = acc[monthYear].intervalosVenta;
             if (intervalos.length > 0) {
               acc[monthYear].promedioIntervalo = Math.round(
-                intervalos.reduce((sum, val) => sum + val, 0) / intervalos.length,
-              )
+                intervalos.reduce((sum, val) => sum + val, 0) / intervalos.length
+              );
             } else {
-              acc[monthYear].promedioIntervalo = 0
+              acc[monthYear].promedioIntervalo = 0;
             }
-            delete acc[monthYear].intervalosVenta // Limpiamos el array temporal
-          })
-
-          return acc
-        }
-        setMonthlyData(Object.entries(groupDataByMonth(filteredByCloserAndOrigin)))
-
+            delete acc[monthYear].intervalosVenta; // Limpiamos el array temporal
+          });
+  
+          return acc;
+        };
+  
+        // Obtener los datos agrupados por mes
+        const groupedData = groupDataByMonth(filteredByCloserAndOrigin);
+  
+        // Convertir el objeto agrupado en un array de entradas [mes, datos]
+        const monthlyEntries = Object.entries(groupedData);
+  
+        // Ordenar los meses del más actual al más viejo
+        const sortedMonthlyEntries = monthlyEntries.sort(([monthA], [monthB]) => {
+          const dateA = new Date(monthA);
+          const dateB = new Date(monthB);
+          return dateB - dateA; // Orden descendente (más reciente primero)
+        });
+  
+        // Actualizar el estado con los meses ordenados
+        setMonthlyData(sortedMonthlyEntries);
+  
         // 🔥 Actualizar selectores con todos los valores disponibles
-        const closersWithSales = filteredData.filter((item) => item["Venta Meg"] > 0).map((item) => item.Responsable)
-        setAvailableClosers([...new Set(closersWithSales)])
+        const closersWithSales = filteredData.filter((item) => item["Venta Meg"] > 0).map((item) => item.Responsable);
+        setAvailableClosers([...new Set(closersWithSales)]);
+  
         // 🔥 Obtener todos los valores únicos de "Origen", excluyendo valores vacíos
         const validOrigins = [...new Set(filteredData.map((item) => item.Origen).filter(Boolean))]
-
-        setAvailableOrigins(validOrigins)
-
+        setAvailableOrigins(validOrigins);
+  
         // Debug info
-        setDebugInfo(JSON.stringify(filteredByCloserAndOrigin[0] || {}, null, 2))
+        setDebugInfo(JSON.stringify(filteredByCloserAndOrigin[0] || {}, null, 2));
       } catch (error) {
-        console.error("Error fetching data:", error)
-        setDebugInfo(`Error: ${error.message}`)
+        console.error("Error fetching data:", error);
+        setDebugInfo(`Error: ${error.message}`);
       } finally {
-        setIsLoading(false)
+        setIsLoading(false); // Indicar que la carga ha terminado
       }
-    }
-
-    fetchData()
+    };
+  
+    fetchData();
   }, [selectedCloser, selectedOrigin, API_BASE_URL])
 
   const formatMonthYear = (month) => {
@@ -293,7 +308,7 @@ export default function SalesMetricsTable() {
       try {
         const response = await fetch("https://metricas-back.onrender.com/goals")
         const result = await response.json()
-
+        console.log("response", result)
         // Formatear la respuesta para monthlyGoals
         const formattedGoals = result.reduce((acc, item) => {
           acc[item.month] = {
@@ -328,7 +343,7 @@ export default function SalesMetricsTable() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-6">Métricas Mensuales</h2>
+      
 
       <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
         <select
@@ -469,15 +484,17 @@ export default function SalesMetricsTable() {
                     <tr key={i} className="border-b bg-gray-200">
                       <td className="py-3 px-4 text-gray-700 font-medium">{label}</td>
                       <td className="text-right py-3 px-4 relative">
-                        <input
-                          type="number"
-                          value={monthlyGoals[month]?.[key] || ""}
-                          onChange={(e) => handleGoalChange(month, key, e.target.value.replace(symbol, ""))}
-                          className="border border-gray-400 rounded-md w-full text-right p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                          {symbol}
-                        </span>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={monthlyGoals[month]?.[key] || ""}
+                            onChange={(e) => handleGoalChange(month, key, e.target.value.replace(symbol, ""))}
+                            className="border border-gray-400 rounded-md w-full text-right p-2 pl-8 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          />
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none">
+                            {symbol}
+                          </span>
+                        </div>
                       </td>
                       <td className="text-center align-middle">
                         <button
