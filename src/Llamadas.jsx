@@ -4,9 +4,11 @@ import React, { useEffect, useState } from "react"
 import "react-datepicker/dist/react-datepicker.css"
 
 export default function SalesMetricsTable() {
+
   const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/metricas"
     : "http://localhost:3000/metricas"
+
 
   const [monthlyData, setMonthlyData] = useState([])
   const [availableClosers, setAvailableClosers] = useState([])
@@ -24,6 +26,7 @@ export default function SalesMetricsTable() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+
         setIsLoading(true); //cambiar cuando pusheo para efecto carga 
 
         const response = await fetch(API_BASE_URL);
@@ -34,11 +37,13 @@ export default function SalesMetricsTable() {
         const currentYear = new Date().getFullYear();
 
         //Filtrar solo los datos del año actual
+
         const filteredData = result.filter((item) => {
           const dateString = item["Fecha correspondiente"];
           const date = new Date(dateString);
           return !isNaN(date) && date.getFullYear() === currentYear;
         });
+
 
         // Aplicar filtro dinámico en el frontend
         const filteredByCloserAndOrigin = filteredData.filter((item) => {
@@ -46,6 +51,7 @@ export default function SalesMetricsTable() {
           const matchesOrigin = selectedOrigin === "all" || item.Origen === selectedOrigin;
           return matchesCloser && matchesOrigin;
         });
+
 
 
         // Agrupar datos después del filtrado
@@ -73,6 +79,7 @@ export default function SalesMetricsTable() {
             clientScheduleMonths[clientName].sort((a, b) => a.date - b.date);
           });
 
+
           const acc = {};
           const clientRecords = {};
 
@@ -92,8 +99,10 @@ export default function SalesMetricsTable() {
                   : itemTimestamp >= schedule.date && itemTimestamp < nextSchedule.date;
               });
 
+
               if (scheduleInfo) {
                 const monthYear = scheduleInfo.monthYear;
+
 
                 if (!clientRecords[monthYear]) {
                   clientRecords[monthYear] = {};
@@ -101,7 +110,7 @@ export default function SalesMetricsTable() {
                 if (!clientRecords[monthYear][clientName]) {
                   clientRecords[monthYear][clientName] = [];
                 }
-
+  
                 clientRecords[monthYear][clientName].push({
                   ...item,
                   timestamp: itemTimestamp,
@@ -125,10 +134,11 @@ export default function SalesMetricsTable() {
                 intervalosVenta: [],
               };
             }
-
+  
             Object.entries(clients).forEach(([clientName, records]) => {
               // Ordenar registros por fecha
               records.sort((a, b) => a.timestamp - b.timestamp);
+
 
               // Encontrar la primera fecha de agendamiento
               const primerAgendamiento = records.find((record) => record.Agenda === 1);
@@ -136,28 +146,30 @@ export default function SalesMetricsTable() {
               // Encontrar la fecha de venta si existe
               const registroVenta = records.find((record) => record["Venta Meg"] > 0);
 
+
               // Si hay tanto agendamiento como venta, calcular el intervalo
               if (primerAgendamiento && registroVenta) {
                 const diasIntervalo = Math.floor(
                   (new Date(registroVenta["Fecha correspondiente"]).getTime() -
                     new Date(primerAgendamiento["Fecha correspondiente"]).getTime()) /
+
                   (1000 * 60 * 60 * 24)
                 );
                 acc[monthYear].intervalosVenta.push(diasIntervalo);
               }
 
               // contar Agenda
+
               const hasAgenda = records.some((record) => record.Agenda === 1);
               if (hasAgenda) {
                 acc[monthYear].Agenda += 1;
               }
 
-              // para "Aplica?", usar solo el registro más reciente
               const latestRecord = records[0];
               if (latestRecord["Aplica?"] === "Aplica") {
                 acc[monthYear]["Aplica?"] += 1;
               }
-
+  
               // Procesar el resto de métricas normalmente
               records.forEach((record) => {
                 acc[monthYear]["Llamadas efectuadas"] += record["Llamadas efectuadas"] || 0;
@@ -173,7 +185,6 @@ export default function SalesMetricsTable() {
                   }
                   acc[monthYear].ventasPorMes[ventaMonthYear] += record["Venta Meg"];
                 }
-
 
                 if (record["Venta Club"] !== 1) {
                   acc[monthYear]["Monto"] += record["Precio"] || 0;
@@ -193,6 +204,7 @@ export default function SalesMetricsTable() {
             } else {
               acc[monthYear].promedioIntervalo = 0;
             }
+
             delete acc[monthYear].intervalosVenta;
           });
 
@@ -205,10 +217,12 @@ export default function SalesMetricsTable() {
         // Convertir el objeto agrupado en un array de entradas [mes, datos]
         const monthlyEntries = Object.entries(groupedData);
 
+
         // Ordenar los meses del más actual al más viejo
         const sortedMonthlyEntries = monthlyEntries.sort(([monthA], [monthB]) => {
           const dateA = new Date(monthA);
           const dateB = new Date(monthB);
+
           return dateB - dateA;
         });
 
@@ -223,14 +237,17 @@ export default function SalesMetricsTable() {
         setAvailableOrigins(validOrigins);
 
     
+
         setDebugInfo(JSON.stringify(filteredByCloserAndOrigin[0] || {}, null, 2));
       } catch (error) {
         console.error("Error fetching data:", error);
         setDebugInfo(`Error: ${error.message}`);
       } finally {
+
         setIsLoading(false);
       }
     };
+
 
     fetchData();
   }, [selectedCloser, selectedOrigin, API_BASE_URL])
@@ -343,6 +360,7 @@ export default function SalesMetricsTable() {
   useEffect(() => {
     const fetchGoals = async () => {
       try {
+
         const url = new URL("http://localhost:3000/goals");
         if (selectedCloser !== "all") url.searchParams.append("selectedCloser", selectedCloser);
         if (selectedOrigin !== "all") url.searchParams.append("selectedOrigin", selectedOrigin);
@@ -350,6 +368,7 @@ export default function SalesMetricsTable() {
         const result = await response.json();
 
       
+
         const formattedGoals = result.reduce((acc, item) => {
           if (item?.month) {
             acc[item.month] = {
@@ -427,6 +446,7 @@ export default function SalesMetricsTable() {
   console.log("monthly data", monthlyData)
   return (
     <div className="p-4">
+
 
       <ToastContainer position="bottom-right" />
       <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
@@ -570,6 +590,7 @@ export default function SalesMetricsTable() {
                             ? "text-green-500"
                             : "text-gray-600"
                             }`}
+
                         >
                           {calculateGoalPercentage(
                             totals["Aplica?"],

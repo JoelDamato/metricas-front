@@ -78,6 +78,7 @@ const Navbar = () => {
                     Ranking
                   </a>
                 </li>
+
                 <li>
                   <a
                     onClick={toggleDropdown}
@@ -87,6 +88,7 @@ const Navbar = () => {
                     Comisiones
                   </a>
                 </li>
+
             </ul>
           )}
         </div>

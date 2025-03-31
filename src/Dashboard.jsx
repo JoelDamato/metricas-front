@@ -4,7 +4,9 @@ import { Chart } from "chart.js/auto";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import es from "date-fns/locale/es";
+
 import { ToastContainer, toast } from 'react-toastify';
+
 
 const DashboardTable = () => {
   const API_URL = "https://metricas-back.onrender.com/dashboard";
@@ -23,6 +25,7 @@ const DashboardTable = () => {
   const [dateRange, setDateRange] = useState([null, null]);
   const [startDate, endDate] = dateRange;
   const [objetivosCloser, setObjetivosCloser] = useState(null);
+
 
 
   const handleDateChange = (update) => {
@@ -54,9 +57,9 @@ const DashboardTable = () => {
       new Date(row["Fecha correspondiente"]).toISOString().slice(0, 7) === monthFilter &&
       (closerFilter ? row["Closer Actual"] === closerFilter : true)
     );
-
+  
     const groupedByCloser = {};
-
+  
     filtered.forEach((row) => {
       const closer = row["Closer Actual"];
       if (!groupedByCloser[closer]) {
@@ -75,7 +78,6 @@ const DashboardTable = () => {
           percentages: {},
         };
       }
-
 
       groupedByCloser[closer]["Total Sales"] += row["Precio"] || 0;
       groupedByCloser[closer]["Ofertas Ganadas"] += row["Venta Meg"] || 0;
@@ -106,6 +108,7 @@ const DashboardTable = () => {
         groupedByCloser[closer]["Cierre/Asistencias"] += 1;
       }
     });
+  
 
 
     Object.keys(groupedByCloser).forEach((closer) => {
@@ -121,13 +124,16 @@ const DashboardTable = () => {
         "Aplican": ((stats["Aplican"] + stats["No aplican"] > 0 ? stats["Aplican"] / (stats["Aplican"] + stats["No aplican"]) : 0) * 100).toFixed(2) + "%",
       };
     });
+  
 
 
     setTotals(groupedByCloser);
   }, [monthFilter, closerFilter, data]);
 
 
+
   const handleInputChange = (closer, metrica, value) => {
+
     setInputs((prev) => ({
       ...prev,
       [closer]: {
@@ -147,6 +153,7 @@ const DashboardTable = () => {
     const formatDateDisplay = (dateString) => {
       return new Date(dateString).toLocaleDateString("es-ES", { timeZone: "UTC" });
     };
+
 
     const formatDateFilter = (dateString) => {
       return new Date(dateString).toISOString().split("T")[0];
@@ -179,6 +186,7 @@ const DashboardTable = () => {
 
         if (fechaCorrespondiente >= startUTC && fechaCorrespondiente <= endUTC && row["Venta Club"] !== 1) {
           if (!ventasPorFecha[fechaStr]) ventasPorFecha[fechaStr] = { equipo: 0, vendedor: 0 };
+
 
           if (row["Venta Meg"] === 1) {
             ventasPorFecha[fechaStr].equipo++;
@@ -346,27 +354,30 @@ const DashboardTable = () => {
   
     // Organizar registros por cliente
     filteredData.forEach((row) => {
+
       const clienteID = row["Nombre cliente"];
       if (!registrosPorCliente[clienteID]) registrosPorCliente[clienteID] = [];
       registrosPorCliente[clienteID].push(row);
     });
-  
+
     // Ordenar registros por fecha
     Object.keys(registrosPorCliente).forEach((clienteID) => {
       registrosPorCliente[clienteID].sort((a, b) => new Date(a["Fecha correspondiente"]) - new Date(b["Fecha correspondiente"]));
     });
+
   
     // Filtrar solo los agendamientos
     const agendamientos = filteredData.filter((row) => row["Agenda"] === 1);
-  
+
     // Procesar cada agendamiento
     agendamientos.forEach((row) => {
       const fechaAgendamiento = new Date(row["Fecha correspondiente"]);
       const clienteID = row["Nombre cliente"];
       const closer = row["Closer Actual"] || row["Responsable"]; // Usar "Responsable" si "Closer Actual" es null
+
   
       if (!closer || closer === "Sin Closer") return;
-  
+
       // Inicializar el resumen para el closer si no existe
       if (!resumenPorCloser[closer]) {
         resumenPorCloser[closer] = {
@@ -380,35 +391,37 @@ const DashboardTable = () => {
           asistenciasConVenta: 0,
         };
       }
+
   
       // Contar el agendamiento
       resumenPorCloser[closer].agendas++;
   
+
       // Verificar si el registro actual cumple con las condiciones de descalificación
       if (row["Agenda"] == 1 && row["Aplica?"] == "No aplica") {
         resumenPorCloser[closer].descalificadas++;
       }
-  
+
       // Obtener registros posteriores al agendamiento
       const registrosPosteriores = registrosPorCliente[clienteID]?.filter(
         (r) => new Date(r["Fecha correspondiente"]) > fechaAgendamiento
       ) || [];
-  
+
       // Verificar si hay algún registro posterior que cumpla con las condiciones de descalificación
       const descalificadaPosterior = registrosPosteriores.some(
         (r) => r["Agenda"] == 1 && r["Aplica?"] == "No aplica"
       );
-  
+
       // Si se encuentra una descalificación posterior, incrementar el contador
       if (descalificadaPosterior) {
         resumenPorCloser[closer].descalificadas++;
       }
-  
+
       // Obtener el último registro posterior
       const ultimoRegistro = registrosPosteriores.length > 0
         ? registrosPosteriores[registrosPosteriores.length - 1]
         : null;
-  
+
       // Procesar el último registro posterior
       if (ultimoRegistro) {
         // Contar asistencias
@@ -418,24 +431,24 @@ const DashboardTable = () => {
             resumenPorCloser[closer].asistenciasConVenta++;
           }
         }
-  
+
         // Contar recuperados
         if (ultimoRegistro["Asistio?"] === "Recuperado") {
           resumenPorCloser[closer].recuperados++;
         }
-  
+
         // Contar inasistencias
         if (ultimoRegistro["Asistio?"] !== "Asistió" && ultimoRegistro["Asistio?"] !== "Recuperado") {
           resumenPorCloser[closer].inasistencias++;
         }
-  
+
         // Contar ventas cerradas
         if (ultimoRegistro["Venta Meg"] === 1) {
           resumenPorCloser[closer].cerradas++;
         }
       }
     });
-  
+
     // Calcular porcentajes
     Object.keys(resumenPorCloser).forEach((closer) => {
       const stats = resumenPorCloser[closer];
@@ -448,6 +461,7 @@ const DashboardTable = () => {
         "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%",
       };
     });
+
   
     setResumen(resumenPorCloser);
   
@@ -564,6 +578,10 @@ const DashboardTable = () => {
 
 
 
+
+  //chequear los porcentajes de aplica y no aplica
+  //agendas totales no lleva porcentaje
+  //cerradas tiene que tomar cuando % de las agendas totales se cerraron
   return (
     <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
       <ToastContainer position="bottom-right" />
@@ -663,6 +681,7 @@ const DashboardTable = () => {
                   <th className="p-2 font-bold">%</th>
                   <th className="p-2 font-bold w-40">Cierre S/Asistencia %</th>
 
+
                 </tr>
               </thead>
               <tbody>
@@ -726,6 +745,7 @@ const DashboardTable = () => {
           </h3>
           <table className="w-full min-w-[700px] max-w-full bg-white shadow-md rounded-lg">
             <tbody>
+
               <tr className="bg-gray-200">
                 <td className="p-3 font-bold text-gray-700">Métrica</td>
                 <td className="p-3 text-gray-600 font-bold">Valor</td>
@@ -748,23 +768,29 @@ const DashboardTable = () => {
                     "No aplican",
                     "Aplican",
                     "Cierre/Asistencias",
+
                   ].includes(key);
 
                   const formattedValue =
                     typeof value === "object"
+
                       ? ""
+
                       : isIntegerValue
                         ? Number(value).toLocaleString("es-AR", { maximumFractionDigits: 0 }) // Entero
                         : Number(value).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Decimal
 
                   return (
+
                     <tr key={key} className="border-b">
+
                       <td className="p-3 font-semibold text-gray-700">{key}</td>
                       <td className="p-3 text-gray-700">{formattedValue}</td>
                       <td className="p-3 text-gray-700">
                         {totals[closerFilter].percentages[key] || "-"}
                       </td>
                       <td className="p-3">
+
                         <div className="relative flex items-center">
                           <span className="absolute left-2 text-gray-500 text-sm">%</span>
                           <input
@@ -843,6 +869,7 @@ const DashboardTable = () => {
                             )}
                           </button>
                         </div>
+
                       </td>
                     </tr>
                   );

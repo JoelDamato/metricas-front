@@ -16,6 +16,7 @@ function App() {
         <Route path="/llamadas" element={<Llamadas />} />
         <Route path="/Ranking" element={<Ranking />} />
         <Route path="/Comisiones" element={<Comisiones />} />
+
       </Routes>
     </Router>
   );
