@@ -21,7 +21,7 @@ export default function Comisiones() {
         const fetchComisionesData = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get('http://localhost:3000/comisiones-meg');
+                const response = await axios.get('https://metricas-back.onrender.com/comisiones-meg');
                 console.log("Resumen backend:", response.data.resumen);
                 const transformedTransactions = response.data.transacciones.map(trans => ({
                     id: trans.cliente,
@@ -34,7 +34,7 @@ export default function Comisiones() {
                 }));
 
                 const transformedEarnings = response.data.resumen.map(earn => ({
-                    
+
 
                     responsible: earn.responsable,
                     month: earn.mes,
@@ -76,10 +76,12 @@ export default function Comisiones() {
 
     // Filtrar ganancias
     const filteredEarnings = useMemo(() => {
-        return earnings.filter(earn =>
-            (monthFilter === '' || earn.month === monthFilter) &&
-            (responsibleFilter === '' || earn.responsible.toLowerCase().includes(responsibleFilter.toLowerCase()))
-        );
+        console.log("Filtrando por mes:", monthFilter); // Log para depuración
+        return earnings.filter(earn => {
+            console.log("Comparando:", earn.month, monthFilter); // Log para depuración
+            return (monthFilter === '' || earn.month === monthFilter) &&
+                (responsibleFilter === '' || earn.responsible.toLowerCase().includes(responsibleFilter.toLowerCase()));
+        });
     }, [earnings, monthFilter, responsibleFilter]);
 
     // Filtrar transacciones
@@ -169,9 +171,10 @@ export default function Comisiones() {
                     >
                         <option value="">Todos los meses</option>
                         {uniqueMonths.map(month => {
-                            const [year, monthNumber] = month.split('-');
-                            const date = new Date(year, parseInt(monthNumber) - 1);
-                            const label = date.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
+                            // Usamos la misma forma de crear la fecha que en la tabla
+                            const monthDate = new Date(`${month}-01`);
+                            const label = monthDate.toLocaleString('es', { month: 'long', year: 'numeric' }).toUpperCase();
+
                             return (
                                 <option key={month} value={month}>
                                     {label}

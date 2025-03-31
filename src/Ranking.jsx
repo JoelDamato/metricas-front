@@ -4,10 +4,9 @@ const Dashboard = () => {
   const [monthlyRankings, setMonthlyRankings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_BASE_URL = "https://metricas-back.onrender.com/llamadas"
-  // process.env.NODE_ENV === "production"
-  //   ? "https://metricas-back.onrender.com/llamadas"
-  //   : "http://localhost:3000/llamadas";
+  const API_BASE_URL = process.env.NODE_ENV === "production"
+    ? "https://metricas-back.onrender.com/llamadas"
+    : "http://localhost:3000/llamadas";
 
   const monthNames = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -177,12 +176,12 @@ const Dashboard = () => {
                       <td className="py-2 px-4 border-t">Total</td>
                       <td className="py-2 px-4 border-t"></td>
                       <td className="py-2 px-4 border-b">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.cashCollected)}
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.cashCollected)}
                       </td>
                       <td className="py-2 px-4 border-t"> {totals.porcentajeRecaudado}%</td>
                       <td className="py-2 px-4 border-t">{totals.offersWon}</td>
                       <td className="py-2 px-4 border-b">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.facturacion)}
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.facturacion)}
                       </td>
                     </tr>
                   </tbody>
