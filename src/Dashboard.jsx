@@ -5,6 +5,9 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import es from "date-fns/locale/es";
 
+import { ToastContainer, toast } from 'react-toastify';
+
+
 const DashboardTable = () => {
   const API_URL = "https://metricas-back.onrender.com/dashboard";
 
@@ -18,8 +21,10 @@ const DashboardTable = () => {
   const canvasRef = useRef(null);
   const [resumen, setResumen] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [updatingMetric, setUpdatingMetric] = useState(null);
   const [dateRange, setDateRange] = useState([null, null]);
   const [startDate, endDate] = dateRange;
+  const [objetivosCloser, setObjetivosCloser] = useState(null);
 
 
 
@@ -73,14 +78,13 @@ const DashboardTable = () => {
           percentages: {},
         };
       }
-  
-  
+
       groupedByCloser[closer]["Total Sales"] += row["Precio"] || 0;
       groupedByCloser[closer]["Ofertas Ganadas"] += row["Venta Meg"] || 0;
       groupedByCloser[closer]["Cash collected"] += row["Cash collected total"] || 0;
       groupedByCloser[closer]["Agendas totales"] += row["Agenda"] || 0;
       groupedByCloser[closer]["Cerradas"] += row["Venta Meg"] || 0;
-  
+
 
       if (row["Asistio?"] === "Asistió") {
         groupedByCloser[closer]["Asistencia"] += 1;
@@ -91,14 +95,14 @@ const DashboardTable = () => {
       if (row["Agenda"] === 1 && row["Asistio?"] !== "Asistió" && row["Asistio?"] !== "Recuperado") {
         groupedByCloser[closer]["No asiste"] += 1;
       }
-  
+
 
       if (row["Aplica?"] === "Aplica") {
         groupedByCloser[closer]["Aplican"] += 1;
       } else if (row["Aplica?"] === "No aplica") {
         groupedByCloser[closer]["No aplican"] += 1;
       }
-  
+
 
       if (row["Venta Meg"] > 0 && (row["Asistio?"] === "Asistió" || row["Asistio?"] === "Recuperado")) {
         groupedByCloser[closer]["Cierre/Asistencias"] += 1;
@@ -106,9 +110,10 @@ const DashboardTable = () => {
     });
   
 
+
     Object.keys(groupedByCloser).forEach((closer) => {
       const stats = groupedByCloser[closer];
-  
+
       stats.percentages = {
         "Cash collected": ((stats["Total Sales"] > 0 ? stats["Cash collected"] / stats["Total Sales"] : 0) * 100).toFixed(2) + "%",
         "Cerradas": ((stats["Agendas totales"] > 0 ? stats["Cerradas"] / stats["Agendas totales"] : 0) * 100).toFixed(2) + "%",
@@ -121,15 +126,23 @@ const DashboardTable = () => {
     });
   
 
+
     setTotals(groupedByCloser);
   }, [monthFilter, closerFilter, data]);
 
 
-  //manejo de inputs
-  const handleInputChange = (closer, field, value) => {
+
+  const handleInputChange = (closer, metrica, value) => {
+
     setInputs((prev) => ({
       ...prev,
-      [closer]: { ...prev[closer], [field]: value },
+      [closer]: {
+        ...prev[closer],
+        [metrica]: {
+          ...prev[closer]?.[metrica],
+          ...value, 
+        },
+      },
     }));
   };
 
@@ -140,6 +153,7 @@ const DashboardTable = () => {
     const formatDateDisplay = (dateString) => {
       return new Date(dateString).toLocaleDateString("es-ES", { timeZone: "UTC" });
     };
+
 
     const formatDateFilter = (dateString) => {
       return new Date(dateString).toISOString().split("T")[0];
@@ -172,6 +186,7 @@ const DashboardTable = () => {
 
         if (fechaCorrespondiente >= startUTC && fechaCorrespondiente <= endUTC && row["Venta Club"] !== 1) {
           if (!ventasPorFecha[fechaStr]) ventasPorFecha[fechaStr] = { equipo: 0, vendedor: 0 };
+
 
           if (row["Venta Meg"] === 1) {
             ventasPorFecha[fechaStr].equipo++;
@@ -319,15 +334,27 @@ const DashboardTable = () => {
     });
 
   };
+  console.log(monthFilter)
 
+
+
+  
   useEffect(() => {
     if (data.length === 0) return;
-
+  
+    // Filtrar los datos por el mes seleccionado
+    const filteredData = data.filter((row) => {
+      const fecha = new Date(row["Fecha correspondiente"]);
+      const monthYear = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+      return monthYear === monthFilter;
+    });
+  
     const resumenPorCloser = {};
     const registrosPorCliente = {};
-
+  
     // Organizar registros por cliente
-    data.forEach((row) => {
+    filteredData.forEach((row) => {
+
       const clienteID = row["Nombre cliente"];
       if (!registrosPorCliente[clienteID]) registrosPorCliente[clienteID] = [];
       registrosPorCliente[clienteID].push(row);
@@ -338,8 +365,9 @@ const DashboardTable = () => {
       registrosPorCliente[clienteID].sort((a, b) => new Date(a["Fecha correspondiente"]) - new Date(b["Fecha correspondiente"]));
     });
 
+  
     // Filtrar solo los agendamientos
-    const agendamientos = data.filter((row) => row["Agenda"] === 1);
+    const agendamientos = filteredData.filter((row) => row["Agenda"] === 1);
 
     // Procesar cada agendamiento
     agendamientos.forEach((row) => {
@@ -347,6 +375,7 @@ const DashboardTable = () => {
       const clienteID = row["Nombre cliente"];
       const closer = row["Closer Actual"] || row["Responsable"]; // Usar "Responsable" si "Closer Actual" es null
 
+  
       if (!closer || closer === "Sin Closer") return;
 
       // Inicializar el resumen para el closer si no existe
@@ -363,8 +392,10 @@ const DashboardTable = () => {
         };
       }
 
+  
       // Contar el agendamiento
       resumenPorCloser[closer].agendas++;
+  
 
       // Verificar si el registro actual cumple con las condiciones de descalificación
       if (row["Agenda"] == 1 && row["Aplica?"] == "No aplica") {
@@ -431,10 +462,120 @@ const DashboardTable = () => {
       };
     });
 
-
+  
     setResumen(resumenPorCloser);
+  
+  }, [data, monthFilter]); // Añadir monthFilter como dependencia
 
-  }, [data]);
+
+
+  useEffect(() => {
+    if (closerFilter && monthFilter) {
+      fetchObjetivosCloser(closerFilter, monthFilter).then((data) => {
+        if (data && Object.keys(data.metricas).length > 0) {
+          const metricas = data.metricas; 
+
+
+          setObjetivosCloser({ metricas });
+
+          setInputs((prevInputs) => ({
+            ...prevInputs,
+            [closerFilter]: Object.keys(metricas).reduce((acc, metrica) => {
+              acc[metrica] = {
+                objetivo: metricas[metrica]?.objetivo ?? "", 
+                base: metricas[metrica]?.base ?? "",
+              };
+              return acc;
+            }, {}),
+          }));
+        } else {
+          setObjetivosCloser({ metricas: {} });
+
+          setInputs((prev) => ({
+            ...prev,
+            [closerFilter]: {},
+          }));
+        }
+      });
+    } else {
+      setObjetivosCloser({ metricas: {} });
+
+      setInputs((prev) => ({
+        ...prev,
+        [closerFilter]: {},
+      }));
+    }
+  }, [closerFilter, monthFilter]);
+
+
+
+  const fetchObjetivosCloser = async (closer, monthFilter) => {
+
+    try {
+      const response = await axios.get("http://localhost:3000/objetivos-closer", {
+        params: { closer, monthFilter },
+      });
+      console.log("response objetivos:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error:", error);
+      return null;
+    }
+  };
+
+
+  const handleUpdate = async (closer, metrica) => {
+    try {
+      setUpdatingMetric(metrica);
+
+      const objetivo = inputs[closer]?.[metrica]?.objetivo;
+      const base = inputs[closer]?.[metrica]?.base;
+
+
+      const data = {
+        closer,
+        monthFilter,
+        metricas: {
+          [metrica]: {
+            objetivo,
+            base,
+          },
+        },
+      };
+
+      await axios.post("http://localhost:3000/update-objetivo-closer", data, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      toast.success("¡Objetivo actualizado con éxito!");
+
+      const updatedData = await fetchObjetivosCloser(closer, monthFilter);
+
+      if (updatedData && updatedData.length > 0) {
+        const nuevasMetricas = updatedData[0]?.metricas || {};
+
+        setObjetivosCloser({ metricas: nuevasMetricas });
+        setInputs((prevInputs) => ({
+          ...prevInputs,
+          [closer]: Object.keys(nuevasMetricas).reduce((acc, key) => {
+            acc[key] = {
+              objetivo: nuevasMetricas[key]?.objetivo ?? "",
+              base: nuevasMetricas[key]?.base ?? "",
+            };
+            return acc;
+          }, {}),
+        }));
+      }
+    } catch (error) {
+      console.error("Error en actualización:", error);
+      toast.error(error.response?.data?.message || "Error al actualizar el objetivo");
+    } finally {
+      setUpdatingMetric(null);
+    }
+  };
+
 
 
 
@@ -443,6 +584,7 @@ const DashboardTable = () => {
   //cerradas tiene que tomar cuando % de las agendas totales se cerraron
   return (
     <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
+      <ToastContainer position="bottom-right" />
       <h2 className="text-xl font-semibold text-gray-700 mb-4">Dashboard de Ventas</h2>
       <div className=" gap-4 mb-6 flex flex-col justify-center items-center md:flex-row md:items-center md:justify-between">
         <DatePicker
@@ -493,7 +635,8 @@ const DashboardTable = () => {
       { /*Tabla resumen de closers */}
       <div className="w-full  py-6 max-w-7xl mx-auto ">
 
-        <h3 className="text-lg w-full py-2 font-semibold text-gray-700 text-center">Resumen por Closer</h3>
+        <h3 className="text-lg w-full py-2 font-semibold text-gray-700 text-start">Resumen por Closer</h3>
+        { monthFilter && <h2 className="text-lg w-full py-2 font-semibold text-gray-700 text-start" >Mes correspondiente: {monthFilter} </h2> }
         <div className="w-full md:max-w-6xl mx-auto overflow-x-auto">
           {isLoading ? (
             // 🔹 Skeleton Loader mientras los datos están cargando
@@ -536,7 +679,8 @@ const DashboardTable = () => {
                   <th className="p-2 font-bold">%</th>
                   <th className="p-2 font-bold">Cerradas</th>
                   <th className="p-2 font-bold">%</th>
-                  <th className="p-2 font-bold w-40">S/Asistencia %</th>
+                  <th className="p-2 font-bold w-40">Cierre S/Asistencia %</th>
+
 
                 </tr>
               </thead>
@@ -601,13 +745,14 @@ const DashboardTable = () => {
           </h3>
           <table className="w-full min-w-[700px] max-w-full bg-white shadow-md rounded-lg">
             <tbody>
-        
+
               <tr className="bg-gray-200">
                 <td className="p-3 font-bold text-gray-700">Métrica</td>
                 <td className="p-3 text-gray-600 font-bold">Valor</td>
                 <td className="p-3 text-gray-600 font-bold">Porcentaje</td>
                 <td className="p-3 text-gray-600 font-bold">Objetivo</td>
                 <td className="p-3 text-gray-600 font-bold">Base</td>
+                <td className="p-3 text-gray-600 font-bold">Acciones</td> 
               </tr>
 
               {Object.entries(totals[closerFilter])
@@ -622,48 +767,109 @@ const DashboardTable = () => {
                     "No asiste",
                     "No aplican",
                     "Aplican",
-                    "Cierre/Asistencias"
+                    "Cierre/Asistencias",
+
                   ].includes(key);
 
                   const formattedValue =
                     typeof value === "object"
-                      ? "" 
+
+                      ? ""
+
                       : isIntegerValue
                         ? Number(value).toLocaleString("es-AR", { maximumFractionDigits: 0 }) // Entero
                         : Number(value).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Decimal
 
                   return (
-                    <tr key={key} className="border-b">                  
+
+                    <tr key={key} className="border-b">
+
                       <td className="p-3 font-semibold text-gray-700">{key}</td>
                       <td className="p-3 text-gray-700">{formattedValue}</td>
                       <td className="p-3 text-gray-700">
                         {totals[closerFilter].percentages[key] || "-"}
                       </td>
                       <td className="p-3">
-                        <input
-                          type="text"
-                          className="border p-2 w-28 rounded"
-                          value={inputs[closerFilter]?.[key]?.objetivo || ""}
-                          onChange={(e) =>
-                            handleInputChange(closerFilter, key, {
-                              ...inputs[closerFilter]?.[key],
-                              objetivo: e.target.value,
-                            })
-                          }
-                        />
+
+                        <div className="relative flex items-center">
+                          <span className="absolute left-2 text-gray-500 text-sm">%</span>
+                          <input
+                            type="text"
+                            className="border p-2 w-28 rounded text-right pl-6"
+                            value={
+                              inputs?.[closerFilter]?.[key]?.objetivo !== undefined
+                                ? inputs[closerFilter][key].objetivo
+                                : objetivosCloser.metricas?.[key]?.objetivo !== undefined
+                                  ? objetivosCloser.metricas[key].objetivo
+                                  : ""
+                            }
+                            onChange={(e) =>
+                              handleInputChange(closerFilter, key, {
+                                objetivo: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </td>
+
+                      <td className="p-3">
+                        <div className="relative flex items-center">
+                          <span className="absolute left-2 text-gray-500 text-sm">%</span>
+                          <input
+                            type="text"
+                            className="border p-2 w-28 rounded text-right pl-6"
+                            value={
+                              inputs?.[closerFilter]?.[key]?.base !== undefined
+                                ? inputs[closerFilter][key].base
+                                : objetivosCloser.metricas?.[key]?.base !== undefined
+                                  ? objetivosCloser.metricas[key].base
+                                  : ""
+                            }
+                            onChange={(e) =>
+                              handleInputChange(closerFilter, key, {
+                                base: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
                       </td>
                       <td className="p-3">
-                        <input
-                          type="text"
-                          className="border p-2 w-28 rounded"
-                          value={inputs[closerFilter]?.[key]?.base || ""}
-                          onChange={(e) =>
-                            handleInputChange(closerFilter, key, {
-                              ...inputs[closerFilter]?.[key],
-                              base: e.target.value,
-                            })
-                          }
-                        />
+                        <div className="w-40  flex justify-start ">
+                          <button
+                            className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center justify-center"
+                            onClick={() => handleUpdate(closerFilter, key)}
+                            disabled={updatingMetric === key} 
+                          >
+                            {updatingMetric === key ? (
+                              <>
+                                <svg
+                                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                  ></circle>
+                                  <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                  ></path>
+                                </svg>
+                                Actualizando...
+                              </>
+                            ) : (
+                              "Actualizar"
+                            )}
+                          </button>
+                        </div>
+
                       </td>
                     </tr>
                   );
