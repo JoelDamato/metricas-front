@@ -78,6 +78,15 @@ const Navbar = () => {
                     Ranking
                   </a>
                 </li>
+                <li>
+                  <a
+                    onClick={toggleDropdown}
+                    href="/comisiones"
+                    className="block px-4 py-2 hover:bg-[#E0C040] transition text-white"
+                  >
+                    Comisiones
+                  </a>
+                </li>
             </ul>
           )}
         </div>

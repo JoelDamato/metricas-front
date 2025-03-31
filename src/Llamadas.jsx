@@ -1,51 +1,53 @@
 "use client"
-
-import { useEffect, useState } from "react"
+import { ToastContainer, toast } from 'react-toastify';
+import React, { useEffect, useState } from "react"
 import "react-datepicker/dist/react-datepicker.css"
 
 export default function SalesMetricsTable() {
-  const API_BASE_URL = "https://metricas-back.onrender.com/metricas"
-  // process.env.NODE_ENV === "production"
-  //   ? "https://metricas-back.onrender.com/metricas"
-  //   : "http://localhost:3000/metricas"
+  const API_BASE_URL = process.env.NODE_ENV === "production"
+    ? "https://metricas-back.onrender.com/metricas"
+    : "http://localhost:3000/metricas"
 
   const [monthlyData, setMonthlyData] = useState([])
   const [availableClosers, setAvailableClosers] = useState([])
   const [availableOrigins, setAvailableOrigins] = useState([])
-  const [selectedCloser, setSelectedCloser] = useState("")
-  const [selectedOrigin, setSelectedOrigin] = useState("")
+  const [selectedCloser, setSelectedCloser] = useState("all")
+  const [selectedOrigin, setSelectedOrigin] = useState("all")
   const [isLoading, setIsLoading] = useState(true)
-  const [monthlyGoals, setMonthlyGoals] = useState(() => {
-    const savedGoals = localStorage.getItem("monthlyGoals")
-    return savedGoals ? JSON.parse(savedGoals) : {}
-  })
+  const [monthlyGoals, setMonthlyGoals] = useState({});
   const [debugInfo, setDebugInfo] = useState("")
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [pendingMonthToSave, setPendingMonthToSave] = useState(null);
+
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading(true); 
+        setIsLoading(true); //cambiar cuando pusheo para efecto carga 
+
         const response = await fetch(API_BASE_URL);
         const result = await response.json();
-        console.log("Datos recibidos del backend:", result);
-  
-        // 🔥 Obtener el año actual
+
+
+        //Obtener el año actual
         const currentYear = new Date().getFullYear();
-  
-        // 🔥 Filtrar solo los datos del año actual
+
+        //Filtrar solo los datos del año actual
         const filteredData = result.filter((item) => {
           const dateString = item["Fecha correspondiente"];
           const date = new Date(dateString);
           return !isNaN(date) && date.getFullYear() === currentYear;
         });
-  
+
         // Aplicar filtro dinámico en el frontend
         const filteredByCloserAndOrigin = filteredData.filter((item) => {
-          const matchesCloser = selectedCloser ? item.Responsable === selectedCloser : true;
-          const matchesOrigin = selectedOrigin ? item.Origen === selectedOrigin : true;
+          const matchesCloser = selectedCloser === "all" || item.Responsable === selectedCloser;
+          const matchesOrigin = selectedOrigin === "all" || item.Origen === selectedOrigin;
           return matchesCloser && matchesOrigin;
         });
-  
+
+
         // Agrupar datos después del filtrado
         const groupDataByMonth = (data) => {
           // Primero, encontrar todos los meses de agendamiento para cada cliente
@@ -55,7 +57,7 @@ export default function SalesMetricsTable() {
               const date = new Date(item["Fecha correspondiente"]);
               const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
               const clientName = item["Nombre cliente"];
-  
+
               if (!clientScheduleMonths[clientName]) {
                 clientScheduleMonths[clientName] = [];
               }
@@ -65,47 +67,41 @@ export default function SalesMetricsTable() {
               });
             }
           });
-  
+
           // Ordenar los meses de agendamiento por fecha para cada cliente
           Object.keys(clientScheduleMonths).forEach((clientName) => {
             clientScheduleMonths[clientName].sort((a, b) => a.date - b.date);
           });
-  
-          // Initialize the accumulator object
+
           const acc = {};
-  
-          // Modificar la estructura inicial de acc para incluir el nuevo campo
-  
-          // Agrupar registros por cliente y período de agendamiento
           const clientRecords = {};
-  
-          // Primero, organizar todos los registros por cliente y período de agendamiento
+
           data.forEach((item) => {
             const clientName = item["Nombre cliente"];
             const itemDate = new Date(item["Fecha correspondiente"]);
             const itemTimestamp = itemDate.getTime();
-  
+
             if (clientScheduleMonths[clientName]) {
               // Encontrar el período de agendamiento correspondiente
               const scheduleInfo = clientScheduleMonths[clientName].find((schedule, index) => {
                 const isLastSchedule = index === clientScheduleMonths[clientName].length - 1;
                 const nextSchedule = !isLastSchedule ? clientScheduleMonths[clientName][index + 1] : null;
-  
+
                 return isLastSchedule
                   ? itemTimestamp >= schedule.date
                   : itemTimestamp >= schedule.date && itemTimestamp < nextSchedule.date;
               });
-  
+
               if (scheduleInfo) {
                 const monthYear = scheduleInfo.monthYear;
-  
+
                 if (!clientRecords[monthYear]) {
                   clientRecords[monthYear] = {};
                 }
                 if (!clientRecords[monthYear][clientName]) {
                   clientRecords[monthYear][clientName] = [];
                 }
-  
+
                 clientRecords[monthYear][clientName].push({
                   ...item,
                   timestamp: itemTimestamp,
@@ -113,7 +109,7 @@ export default function SalesMetricsTable() {
               }
             }
           });
-  
+
           // Procesar los registros agrupados
           Object.entries(clientRecords).forEach(([monthYear, clients]) => {
             if (!acc[monthYear]) {
@@ -125,60 +121,60 @@ export default function SalesMetricsTable() {
                 Monto: 0,
                 "Cash collected": 0,
                 ventasPorMes: {},
-                // Nuevo campo para rastrear los intervalos de venta
+
                 intervalosVenta: [],
               };
             }
-  
+
             Object.entries(clients).forEach(([clientName, records]) => {
               // Ordenar registros por fecha
               records.sort((a, b) => a.timestamp - b.timestamp);
-  
+
               // Encontrar la primera fecha de agendamiento
               const primerAgendamiento = records.find((record) => record.Agenda === 1);
-  
+
               // Encontrar la fecha de venta si existe
               const registroVenta = records.find((record) => record["Venta Meg"] > 0);
-  
+
               // Si hay tanto agendamiento como venta, calcular el intervalo
               if (primerAgendamiento && registroVenta) {
                 const diasIntervalo = Math.floor(
                   (new Date(registroVenta["Fecha correspondiente"]).getTime() -
                     new Date(primerAgendamiento["Fecha correspondiente"]).getTime()) /
-                    (1000 * 60 * 60 * 24)
+                  (1000 * 60 * 60 * 24)
                 );
                 acc[monthYear].intervalosVenta.push(diasIntervalo);
               }
-  
-              // Contar Agenda
+
+              // contar Agenda
               const hasAgenda = records.some((record) => record.Agenda === 1);
               if (hasAgenda) {
                 acc[monthYear].Agenda += 1;
               }
-  
-              // Para "Aplica?", usar solo el registro más reciente
+
+              // para "Aplica?", usar solo el registro más reciente
               const latestRecord = records[0];
               if (latestRecord["Aplica?"] === "Aplica") {
                 acc[monthYear]["Aplica?"] += 1;
               }
-  
+
               // Procesar el resto de métricas normalmente
               records.forEach((record) => {
                 acc[monthYear]["Llamadas efectuadas"] += record["Llamadas efectuadas"] || 0;
                 acc[monthYear]["Venta Meg"] += record["Venta Meg"] || 0;
-  
+
                 // Registrar ventas por mes
                 if (record["Venta Meg"] > 0) {
                   const ventaDate = new Date(record["Fecha correspondiente"]);
                   const ventaMonthYear = `${ventaDate.getFullYear()}-${String(ventaDate.getMonth() + 1).padStart(2, "0")}`;
-  
+
                   if (!acc[monthYear].ventasPorMes[ventaMonthYear]) {
                     acc[monthYear].ventasPorMes[ventaMonthYear] = 0;
                   }
                   acc[monthYear].ventasPorMes[ventaMonthYear] += record["Venta Meg"];
                 }
-  
-                // Excluir "Venta Club": 1 en los cálculos
+
+
                 if (record["Venta Club"] !== 1) {
                   acc[monthYear]["Monto"] += record["Precio"] || 0;
                   acc[monthYear]["Cash collected"] += record["Cash collected total"] || 0;
@@ -186,7 +182,7 @@ export default function SalesMetricsTable() {
               });
             });
           });
-  
+
           // Calcular el promedio de intervalos para cada mes
           Object.keys(acc).forEach((monthYear) => {
             const intervalos = acc[monthYear].intervalosVenta;
@@ -197,46 +193,45 @@ export default function SalesMetricsTable() {
             } else {
               acc[monthYear].promedioIntervalo = 0;
             }
-            delete acc[monthYear].intervalosVenta; // Limpiamos el array temporal
+            delete acc[monthYear].intervalosVenta;
           });
-  
+
           return acc;
         };
-  
+
         // Obtener los datos agrupados por mes
         const groupedData = groupDataByMonth(filteredByCloserAndOrigin);
-  
+
         // Convertir el objeto agrupado en un array de entradas [mes, datos]
         const monthlyEntries = Object.entries(groupedData);
-  
+
         // Ordenar los meses del más actual al más viejo
         const sortedMonthlyEntries = monthlyEntries.sort(([monthA], [monthB]) => {
           const dateA = new Date(monthA);
           const dateB = new Date(monthB);
-          return dateB - dateA; // Orden descendente (más reciente primero)
+          return dateB - dateA;
         });
+
   
-        // Actualizar el estado con los meses ordenados
         setMonthlyData(sortedMonthlyEntries);
-  
-        // 🔥 Actualizar selectores con todos los valores disponibles
+        setIsLoading(false)
+
         const closersWithSales = filteredData.filter((item) => item["Venta Meg"] > 0).map((item) => item.Responsable);
         setAvailableClosers([...new Set(closersWithSales)]);
-  
-        // 🔥 Obtener todos los valores únicos de "Origen", excluyendo valores vacíos
+
         const validOrigins = [...new Set(filteredData.map((item) => item.Origen).filter(Boolean))]
         setAvailableOrigins(validOrigins);
-  
-        // Debug info
+
+    
         setDebugInfo(JSON.stringify(filteredByCloserAndOrigin[0] || {}, null, 2));
       } catch (error) {
         console.error("Error fetching data:", error);
         setDebugInfo(`Error: ${error.message}`);
       } finally {
-        setIsLoading(false); // Indicar que la carga ha terminado
+        setIsLoading(false);
       }
     };
-  
+
     fetchData();
   }, [selectedCloser, selectedOrigin, API_BASE_URL])
 
@@ -262,96 +257,185 @@ export default function SalesMetricsTable() {
   }
 
   const handleSelectChange = (setter) => (event) => {
-    console.log("Valor seleccionado:", event.target.value)
     setter(event.target.value)
   }
-  const handleGoalChange = (month, field, value) => {
-    setMonthlyGoals((prevGoals) => ({
-      ...prevGoals,
-      [month]: {
-        ...prevGoals[month],
-        [field]: value,
-      },
-    }))
-  }
+
+  const handleGoalChange = (month, metricName, value) => {
+    setMonthlyGoals((prev) => {
+     
+      const updatedMonthlyGoals = { ...prev };
+
+      
+      if (!updatedMonthlyGoals[month]) {
+        updatedMonthlyGoals[month] = {
+          closer: selectedCloser,
+          origin: selectedOrigin,
+          metrics: []
+        };
+      }
+
+   
+      const currentMetrics = updatedMonthlyGoals[month].metrics || [];
+
+    
+      const metricIndex = currentMetrics.findIndex((m) => m.name === metricName);
+
+ 
+      if (value === "") {
+  
+        return prev;
+      } else if (metricIndex !== -1) {
+
+        updatedMonthlyGoals[month].metrics = currentMetrics.map((metric, index) =>
+          index === metricIndex ? { ...metric, goal: Number(value) } : metric
+        );
+      } else {
+ 
+        updatedMonthlyGoals[month].metrics.push({
+          name: metricName,
+          goal: Number(value)
+        });
+      }
+
+      return updatedMonthlyGoals;
+    });
+  };
+
+  const calculateGoalPercentage = (actual, goal) => {
+    if (!goal || goal === 0) return 0;
+    const percentage = (actual / goal) * 100;
+    return parseFloat(percentage.toFixed(2));
+  };
 
   const saveGoal = async (month) => {
+
+    const metrics = monthlyGoals[month]?.metrics || [];
     const goalData = {
       month,
-      facturacion: monthlyGoals[month]?.facturacion || 0,
-      porcentaje: monthlyGoals[month]?.porcentaje || 0,
-    }
+      closer: selectedCloser,
+      origin: selectedOrigin,
+      metrics: metrics,
+    };
 
-    console.log("📩 Enviando al backend:", goalData)
 
     try {
-      const response = await fetch(`https://metricas-back.onrender.com/update-goal`, {
+      const response = await fetch(`http://localhost:3000/update-goal`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(goalData),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error("Error al guardar los datos")
+        throw new Error("Error al guardar los datos");
       }
 
-      console.log("✅ Objetivo actualizado correctamente!")
+      const data = await response.json();
+      toast.success("Objetivo actualizado correctamente!");
     } catch (error) {
-      console.error("❌ Error al actualizar objetivos:", error)
+      console.error("Error al actualizar objetivos:", error);
+      toast.error("Error al actualizar objetivos");
     }
-  }
+  };
+
 
   useEffect(() => {
     const fetchGoals = async () => {
       try {
-        const response = await fetch("https://metricas-back.onrender.com/goals")
-        const result = await response.json()
-        console.log("response", result)
-        // Formatear la respuesta para monthlyGoals
+        const url = new URL("http://localhost:3000/goals");
+        if (selectedCloser !== "all") url.searchParams.append("selectedCloser", selectedCloser);
+        if (selectedOrigin !== "all") url.searchParams.append("selectedOrigin", selectedOrigin);
+        const response = await fetch(url.toString());
+        const result = await response.json();
+
+      
         const formattedGoals = result.reduce((acc, item) => {
-          acc[item.month] = {
-            facturacion: item.facturacion || "",
-            porcentaje: item.porcentaje || "",
+          if (item?.month) {
+            acc[item.month] = {
+              closer: item.closer || selectedCloser || "all",
+              origin: item.origin || selectedOrigin || "all",
+              metrics: item.metrics || [
+                
+                { name: "Llamadas Agendadas", goal: 0 },
+                { name: "Llamadas efectuadas", goal: 0 },
+                { name: "Venta Meg", goal: 0 },
+                { name: "Agenda", goal: 0 }
+              ]
+            };
           }
-          return acc
-        }, {})
+          return acc;
+        }, {});
 
-        setMonthlyGoals(formattedGoals)
+
+        setMonthlyGoals(prev => {
+          const merged = {
+            ...prev,
+            ...formattedGoals
+          };
+
+          
+          console.log("Estado final de monthlyGoals:", merged);
+
+          return merged;
+        });
+
+        setIsLoading(false);
       } catch (error) {
-        console.error("Error al obtener objetivos:", error)
+        console.error("Error al obtener objetivos:", error);
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchGoals()
-  }, [])
+    fetchGoals();
+  }, [selectedCloser, selectedOrigin]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amount)
   }
 
-  const calculatePercentage = (value, total) => {
-    if (total === 0) return "0%"
-    return `${((value / total) * 100).toFixed(2)}%`
-  }
 
   const calculateRealPercentage = (cashCollected, price) => {
     if (price === 0) return "0%"
     return `${((cashCollected / price) * 100).toFixed(2)}%`
   }
 
+  const handleSaveGoal = (month) => {
+    const current = new Date();
+    const currentMonth = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}`;
+
+    if (month !== currentMonth) {
+      setPendingMonthToSave(month);
+      setShowPasswordModal(true);
+    } else {
+      saveGoal(month);
+    }
+  };
+
+  const confirmPasswordAndSave = () => {
+    if (passwordInput === "hola1234") {
+      saveGoal(pendingMonthToSave);
+      setShowPasswordModal(false);
+      setPasswordInput("");
+      setPendingMonthToSave(null);
+    } else {
+      toast.error("No tiene permisos para ejecutar la acción");
+    }
+  };
+
+
+  console.log("monthly data", monthlyData)
   return (
     <div className="p-4">
-      
 
+      <ToastContainer position="bottom-right" />
       <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
         <select
           value={selectedCloser}
           onChange={handleSelectChange(setSelectedCloser)}
           className="p-2 border rounded-md"
         >
-          <option value="">Todos los Closers</option>
+          <option value="all">Todos los Closers</option>
           {availableClosers.map((closer) => (
             <option key={closer} value={closer}>
               {closer}
@@ -364,7 +448,7 @@ export default function SalesMetricsTable() {
           onChange={handleSelectChange(setSelectedOrigin)}
           className="p-2 border rounded-md"
         >
-          <option value="">Todos los Orígenes</option>
+          <option value="all">Todos los Orígenes</option>
           {availableOrigins.map((origin) => (
             <option key={origin} value={origin}>
               {origin}
@@ -382,149 +466,342 @@ export default function SalesMetricsTable() {
           />
         </div>
       ) : (
-        <div className="flex flex-wrap justify-center gap-4">
-          {monthlyData.map(([month, totals], index) => (
-            <div key={index} className="w-full md:w-1/3 bg-white rounded-lg shadow-lg p-6">
-              {/* 🏆 Título del mes con efecto degradado */}
-              <h3 className="text-xl font-bold text-center mb-6 text-gray-800 border-b pb-2">
-                {formatMonthYear(month)}
-              </h3>
 
-              <table className="w-full border-collapse rounded-lg overflow-hidden shadow-md">
-                <tbody>
-                  {/* 🟢 Filas de métricas con fondo alternado */}
-                  {[
-                    {
-                      label: "Llamadas Agendadas",
-                      value: totals.Agenda,
-                      percentage: null, // Removido el porcentaje
-                    },
-                    {
-                      label: "Llamadas Aplicables",
-                      value: totals["Aplica?"],
-                      percentage: calculatePercentage(totals["Aplica?"], totals.Agenda), // De agendadas
-                    },
-                    {
-                      label: "Llamadas Efectuadas",
-                      value: totals["Llamadas efectuadas"],
-                      percentage: calculatePercentage(totals["Llamadas efectuadas"], totals["Aplica?"]), // De aplicables
-                    },
-                    {
-                      label: "Llamadas Vendidas",
-                      value: totals["Venta Meg"],
-                      percentage: calculatePercentage(totals["Venta Meg"], totals["Llamadas efectuadas"]), // De efectuadas
-                    },
-                    {
-                      label: "Intervalo de Ventas",
-                      value: `${totals.promedioIntervalo || 0} días`,
-                      percentage: null,
-                    },
-                  ].map(({ label, value, percentage }, i) => (
-                    <tr key={i} className={`border-b ${i % 2 === 0 ? "bg-gray-100" : "bg-white"}`}>
-                      <td className="py-2 px-2 text-gray-700 font-medium">{label}</td>
-                      <td className="text-right py-2 px-2 font-semibold">{value}</td>
-                      {percentage !== null && <td className="text-right py-2 px-2 text-gray-600">{percentage}</td>}
-                    </tr>
-                  ))}
-                  {/* Nuevo desplegable para mostrar ventas por mes */}
-                  {totals.ventasPorMes && Object.keys(totals.ventasPorMes).length > 0 && (
-                    <tr className="bg-gray-50">
-                      <td colSpan="3" className="py-0">
-                        <details className="w-full">
-                          <summary className="py-2 px-2 text-gray-700 font-medium cursor-pointer hover:bg-gray-100 flex items-center">
-                            <span className="flex-1">Desglose de ventas por mes</span>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </summary>
-                          <div className="pl-4 pr-2 py-2">
-                            {Object.entries(totals.ventasPorMes).map(([ventaMonth, cantidad], i) => (
-                              <div
-                                key={i}
-                                className="flex justify-between py-1 text-sm border-b border-gray-100 last:border-0"
-                              >
-                                <span className="text-gray-600">{formatMonthYear(ventaMonth)}</span>
-                                <span className="font-medium">{cantidad}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      </td>
-                    </tr>
-                  )}
 
-                  {/* Resto de las filas */}
-                  {[
-                    { label: "Monto Total", value: formatCurrency(totals["Monto"]), percentage: null },
-                    { label: "Cash Collected", value: formatCurrency(totals["Cash collected"]), percentage: null },
-                    {
-                      label: "% Real",
-                      value: calculateRealPercentage(totals["Cash collected"], totals["Monto"]),
-                      percentage: null,
-                    },
-                  ].map(({ label, value, percentage }, i) => (
-                    <tr key={i} className={`border-b ${i % 2 === 0 ? "bg-gray-100" : "bg-white"}`}>
-                      <td className="py-2 px-2 text-gray-700 font-medium">{label}</td>
-                      <td className="text-right py-2 px-2 font-semibold">{value}</td>
-                      {percentage !== null && <td className="text-right py-2 px-2 text-gray-600">{percentage}</td>}
-                    </tr>
-                  ))}
-
-                  {/* 🎯 Objetivos y porcentaje objetivo */}
-                  {[
-                    { label: "Objetivo Facturación", key: "facturacion", symbol: "$" },
-                    { label: "% Objetivo", key: "porcentaje", symbol: "%" },
-                  ].map(({ label, key, symbol }, i) => (
-                    <tr key={i} className="border-b bg-gray-200">
-                      <td className="py-3 px-4 text-gray-700 font-medium">{label}</td>
-                      <td className="text-right py-3 px-4 relative">
-                        <div className="relative">
-                          <input
-                            type="number"
-                            value={monthlyGoals[month]?.[key] || ""}
-                            onChange={(e) => handleGoalChange(month, key, e.target.value.replace(symbol, ""))}
-                            className="border border-gray-400 rounded-md w-full text-right p-2 pl-8 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                          />
-                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none">
-                            {symbol}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="text-center align-middle">
-                        <button
-                          onClick={() => saveGoal(month)}
-                          className="bg-black text-white rounded-lg p-2 transition-all duration-300 hover:bg-gray-800 flex items-center justify-center mx-auto"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.5"
-                            stroke="currentColor"
-                            className="w-5 h-5"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
-                            />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        monthlyData.length === 0 ? (
+          <div className="flex justify-center items-center">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-800">No hay datos disponibles</h2>
+              <p className="text-gray-600">No hay datos para mostrar con los filtros seleccionados</p>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ) :
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
+            {monthlyData.map(([month, totals], index) => (
+              <div
+                key={index}
+                className="w-full bg-white rounded-lg shadow-md overflow-hidden transform transition-all duration-300 hover:shadow-lg"
+              >
+                {/* 🏆 Título del mes con efecto degradado */}
+                <h3 className="text-lg font-bold text-center py-2 bg-gradient-to-r from-[#E0C040] to-[#f7db6b] text-white">
+                  {formatMonthYear(month)}
+                </h3>
+
+                {/* 📊 Contenedor de métricas */}
+                <div className="p-1 space-y-1">
+                  {/* 🟢 Llamadas Agendadas */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-md font-semibold text-gray-700 w-[40%]">Llamadas Agendadas</span>
+                      <span className="text-md font-bold text-gray-700">{totals.Agenda}</span>
+                    </div>
+                    <div className="mt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-md text-gray-600">Objetivo:</span>
+                        <input
+                          type="number"
+                          value={
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Agendadas")?.goal || ""
+                          }
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            handleGoalChange(month, "Llamadas Agendadas", inputValue);
+                          }}
+                          className="border border-gray-300 rounded text-md w-16 text-right p-0.5 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="mt-0.5 text-md text-gray-600">
+                        Cumplimiento:{" "}
+                        <span
+                          className={`font-semibold ${calculateGoalPercentage(
+                            totals.Agenda,
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Agendadas")?.goal
+                          ) >= 100
+                            ? "text-green-500"
+                            : "text-gray-600"
+                            }`}
+                        >
+                          {calculateGoalPercentage(
+                            totals.Agenda,
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Agendadas")?.goal
+                          )}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 🟢 Llamadas Aplicables */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-md font-semibold text-gray-700 w-[40%]">Llamadas Aplicables</span>
+                      <span className="text-md font-bold w-[20%] text-gray-700  text-center ">{totals["Aplica?"]}</span>
+
+                      <span className="text-md font-bold w-[20%] text-gray-700 text-end">
+                        {!isNaN(parseFloat(totals["Aplica?"])) &&
+                          !isNaN(parseFloat(totals.Agenda)) &&
+                          parseFloat(totals.Agenda) > 0
+                          ? `${((parseFloat(totals["Aplica?"]) * 100) / parseFloat(totals.Agenda)).toFixed(2)} %`
+                          : "-"}
+                      </span>
+
+                    </div>
+                    <div className="mt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-md text-gray-600">Objetivo:</span>
+                        <input
+                          type="number"
+                          value={
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Aplicables")?.goal || ""
+                          }
+
+                          onChange={(e) => handleGoalChange(month, "Llamadas Aplicables", e.target.value)}
+                          className="border border-gray-300 rounded text-md w-16 text-right p-0.5 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="mt-0.5 text-md text-gray-600">
+                        Cumplimiento:{" "}
+                        <span
+                          className={`font-semibold ${calculateGoalPercentage(
+                            totals["Aplica?"],
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Aplicables")?.goal
+                          ) >= 100
+                            ? "text-green-500"
+                            : "text-gray-600"
+                            }`}
+                        >
+                          {calculateGoalPercentage(
+                            totals["Aplica?"],
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Aplicables")?.goal
+                          )}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 🟢 Llamadas Efectuadas */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-md font-semibold text-gray-700 w-[40%] ">Llamadas Efectuadas</span>
+                      <span className="text-md font-bold w-[20%] text-gray-700 text-center">{totals["Llamadas efectuadas"]}</span>
+
+                      <span className="text-md font-bold w-[20%] text-gray-700 text-end">
+                        {!isNaN(parseFloat(totals["Llamadas efectuadas"])) &&
+                          !isNaN(parseFloat(totals["Aplica?"])) &&
+                          parseFloat(totals["Aplica?"]) > 0
+                          ? `${((parseFloat(totals["Llamadas efectuadas"]) * 100) / parseFloat(totals["Aplica?"])).toFixed(2)} %`
+                          : "-"}
+                      </span>
+
+                    </div>
+                    <div className="mt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-md text-gray-600">Objetivo:</span>
+                        <input
+                          type="number"
+                          value={
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Efectuadas")?.goal || ""
+                          }
+                          onChange={(e) => handleGoalChange(month, "Llamadas Efectuadas", e.target.value)}
+                          className="border border-gray-300 rounded text-md w-16 text-right p-0.5 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="mt-0.5 text-md text-gray-600">
+                        Cumplimiento:{" "}
+                        <span
+                          className={`font-semibold ${calculateGoalPercentage(
+                            totals["Llamadas efectuadas"],
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Efectuadas")?.goal
+                          ) >= 100
+                            ? "text-green-500"
+                            : "text-gray-600"
+                            }`}
+                        >
+                          {calculateGoalPercentage(
+                            totals["Llamadas efectuadas"],
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Efectuadas")?.goal
+                          )}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 🟢 Llamadas Vendidas */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-md font-semibold text-gray-700 w-[40%]">Llamadas Vendidas</span>
+                      <span className="text-md font-bold text-gray-700 w-[20%]  text-center ">{totals["Venta Meg"]}</span>
+                      <span className="text-md font-bold text-gray-700 w-[20%] text-end">
+                        {!isNaN(parseFloat(totals["Venta Meg"])) &&
+                          !isNaN(parseFloat(totals["Llamadas efectuadas"])) &&
+                          parseFloat(totals["Llamadas efectuadas"]) > 0
+                          ? `${((parseFloat(totals["Venta Meg"]) * 100) / parseFloat(totals["Llamadas efectuadas"])).toFixed(2)} %`
+                          : "-"}
+                      </span>
+
+                    </div>
+                    <div className="mt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-md text-gray-600">Objetivo:</span>
+                        <input
+                          type="number"
+                          value={
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Vendidas")?.goal || ""
+                          }
+                          onChange={(e) => handleGoalChange(month, "Llamadas Vendidas", e.target.value)}
+                          className="border border-gray-300 rounded text-md w-16 text-right p-0.5 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="mt-0.5 text-md text-gray-600">
+                        Cumplimiento:{" "}
+                        <span
+                          className={`font-semibold ${calculateGoalPercentage(
+                            totals["Venta Meg"],
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Vendidas")?.goal
+                          ) >= 100
+                            ? "text-green-500"
+                            : "text-gray-600"
+                            }`}
+                        >
+                          {calculateGoalPercentage(
+                            totals["Venta Meg"],
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Llamadas Vendidas")?.goal
+                          )}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 🟢 Intervalo de Ventas */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-md font-semibold text-gray-700">Intervalo de Ventas</span>
+                      <span className="text-md font-bold text-gray-700">{`${totals.promedioIntervalo || 0} días`}</span>
+                    </div>
+                  </div>
+
+                  {/* 🟢 Monto Total */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-md font-semibold text-gray-700">Monto Total</span>
+                      <span className="text-md font-bold text-gray-700">{formatCurrency(totals["Monto"])}</span>
+                    </div>
+                    <div className="mt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-md text-gray-600">Objetivo:</span>
+                        <input
+                          type="number"
+                          value={
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Monto Total")?.goal || ""
+                          }
+                          onChange={(e) => handleGoalChange(month, "Monto Total", e.target.value)}
+                          className="border border-gray-300 rounded text-xs w-16 text-right p-0.5 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="mt-0.5 text-xs text-gray-600">
+                        Cumplimiento:{" "}
+                        <span
+                          className={`font-semibold ${calculateGoalPercentage(
+                            totals["Monto"],
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Monto Total")?.goal
+                          ) >= 100
+                            ? "text-green-500"
+                            : "text-gray-600"
+                            }`}
+                        >
+                          {calculateGoalPercentage(
+                            totals["Monto"],
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Monto Total")?.goal
+                          )}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cash Collected */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-gray-700">Cash Collected</span>
+                      <span className="text-xs font-bold text-gray-700">{formatCurrency(totals["Cash collected"])}</span>
+                    </div>
+                  </div>
+
+                  {/*  % Real */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-gray-700">% Real</span>
+                      <span className="text-xs font-bold text-gray-700">
+                        {calculateRealPercentage(totals["Cash collected"], totals["Monto"])}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2">
+                  <button
+                    onClick={() => handleSaveGoal(month)}
+                    className="w-full bg-[#E0C040] text-white py-1 px-2 rounded text-md hover:bg-[#f7db6b] transition-all duration-300 flex items-center justify-center"
+                  >
+                    <span>Establecer Objetivo</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-3 w-3 ml-1"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+            ))}
+            {showPasswordModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-md max-w-sm w-full space-y-4">
+                  <h2 className="text-lg font-bold text-gray-800 text-center">⚠️ Confirmación requerida</h2>
+                  <p className="text-sm text-gray-600 text-center">
+                    Estás intentando modificar un objetivo fuera del mes actual.
+                  </p>
+                  <input
+                    type="password"
+                    placeholder="Contraseña"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={() => {
+                        setShowPasswordModal(false);
+                        setPasswordInput("");
+                        setPendingMonthToSave(null);
+                      }}
+                      className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={confirmPasswordAndSave}
+                      className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      Confirmar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>)}
     </div>
   )
 }

@@ -326,36 +326,47 @@ const DashboardTable = () => {
     });
 
   };
+  console.log(monthFilter)
 
+
+
+  
   useEffect(() => {
     if (data.length === 0) return;
-
+  
+    // Filtrar los datos por el mes seleccionado
+    const filteredData = data.filter((row) => {
+      const fecha = new Date(row["Fecha correspondiente"]);
+      const monthYear = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+      return monthYear === monthFilter;
+    });
+  
     const resumenPorCloser = {};
     const registrosPorCliente = {};
-
+  
     // Organizar registros por cliente
-    data.forEach((row) => {
+    filteredData.forEach((row) => {
       const clienteID = row["Nombre cliente"];
       if (!registrosPorCliente[clienteID]) registrosPorCliente[clienteID] = [];
       registrosPorCliente[clienteID].push(row);
     });
-
+  
     // Ordenar registros por fecha
     Object.keys(registrosPorCliente).forEach((clienteID) => {
       registrosPorCliente[clienteID].sort((a, b) => new Date(a["Fecha correspondiente"]) - new Date(b["Fecha correspondiente"]));
     });
-
+  
     // Filtrar solo los agendamientos
-    const agendamientos = data.filter((row) => row["Agenda"] === 1);
-
+    const agendamientos = filteredData.filter((row) => row["Agenda"] === 1);
+  
     // Procesar cada agendamiento
     agendamientos.forEach((row) => {
       const fechaAgendamiento = new Date(row["Fecha correspondiente"]);
       const clienteID = row["Nombre cliente"];
       const closer = row["Closer Actual"] || row["Responsable"]; // Usar "Responsable" si "Closer Actual" es null
-
+  
       if (!closer || closer === "Sin Closer") return;
-
+  
       // Inicializar el resumen para el closer si no existe
       if (!resumenPorCloser[closer]) {
         resumenPorCloser[closer] = {
@@ -369,35 +380,35 @@ const DashboardTable = () => {
           asistenciasConVenta: 0,
         };
       }
-
+  
       // Contar el agendamiento
       resumenPorCloser[closer].agendas++;
-
+  
       // Verificar si el registro actual cumple con las condiciones de descalificación
       if (row["Agenda"] == 1 && row["Aplica?"] == "No aplica") {
         resumenPorCloser[closer].descalificadas++;
       }
-
+  
       // Obtener registros posteriores al agendamiento
       const registrosPosteriores = registrosPorCliente[clienteID]?.filter(
         (r) => new Date(r["Fecha correspondiente"]) > fechaAgendamiento
       ) || [];
-
+  
       // Verificar si hay algún registro posterior que cumpla con las condiciones de descalificación
       const descalificadaPosterior = registrosPosteriores.some(
         (r) => r["Agenda"] == 1 && r["Aplica?"] == "No aplica"
       );
-
+  
       // Si se encuentra una descalificación posterior, incrementar el contador
       if (descalificadaPosterior) {
         resumenPorCloser[closer].descalificadas++;
       }
-
+  
       // Obtener el último registro posterior
       const ultimoRegistro = registrosPosteriores.length > 0
         ? registrosPosteriores[registrosPosteriores.length - 1]
         : null;
-
+  
       // Procesar el último registro posterior
       if (ultimoRegistro) {
         // Contar asistencias
@@ -407,24 +418,24 @@ const DashboardTable = () => {
             resumenPorCloser[closer].asistenciasConVenta++;
           }
         }
-
+  
         // Contar recuperados
         if (ultimoRegistro["Asistio?"] === "Recuperado") {
           resumenPorCloser[closer].recuperados++;
         }
-
+  
         // Contar inasistencias
         if (ultimoRegistro["Asistio?"] !== "Asistió" && ultimoRegistro["Asistio?"] !== "Recuperado") {
           resumenPorCloser[closer].inasistencias++;
         }
-
+  
         // Contar ventas cerradas
         if (ultimoRegistro["Venta Meg"] === 1) {
           resumenPorCloser[closer].cerradas++;
         }
       }
     });
-
+  
     // Calcular porcentajes
     Object.keys(resumenPorCloser).forEach((closer) => {
       const stats = resumenPorCloser[closer];
@@ -437,11 +448,13 @@ const DashboardTable = () => {
         "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%",
       };
     });
-
-
+  
     setResumen(resumenPorCloser);
+  
+  }, [data, monthFilter]); // Añadir monthFilter como dependencia
 
-  }, [data]);
+
+
   useEffect(() => {
     if (closerFilter && monthFilter) {
       fetchObjetivosCloser(closerFilter, monthFilter).then((data) => {
@@ -604,7 +617,8 @@ const DashboardTable = () => {
       { /*Tabla resumen de closers */}
       <div className="w-full  py-6 max-w-7xl mx-auto ">
 
-        <h3 className="text-lg w-full py-2 font-semibold text-gray-700 text-center">Resumen por Closer</h3>
+        <h3 className="text-lg w-full py-2 font-semibold text-gray-700 text-start">Resumen por Closer</h3>
+        { monthFilter && <h2 className="text-lg w-full py-2 font-semibold text-gray-700 text-start" >Mes correspondiente: {monthFilter} </h2> }
         <div className="w-full md:max-w-6xl mx-auto overflow-x-auto">
           {isLoading ? (
             // 🔹 Skeleton Loader mientras los datos están cargando
@@ -647,7 +661,7 @@ const DashboardTable = () => {
                   <th className="p-2 font-bold">%</th>
                   <th className="p-2 font-bold">Cerradas</th>
                   <th className="p-2 font-bold">%</th>
-                  <th className="p-2 font-bold w-40">S/Asistencia %</th>
+                  <th className="p-2 font-bold w-40">Cierre S/Asistencia %</th>
 
                 </tr>
               </thead>
