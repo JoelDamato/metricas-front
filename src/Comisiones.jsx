@@ -16,13 +16,17 @@ export default function Comisiones() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const API_BASE_URL = process.env.NODE_ENV === "production"
+        ? "https://metricas-back.onrender.com/"
+        : "http://localhost:3000/"
+
     // Fetch de datos al montar el componente
     useEffect(() => {
         const fetchComisionesData = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get('https://metricas-back.onrender.com/comisiones-meg');
-                console.log("Resumen backend:", response.data.resumen);
+                const response = await axios.get(`${API_BASE_URL}comisiones-meg`);
+                
                 const transformedTransactions = response.data.transacciones.map(trans => ({
                     id: trans.cliente,
                     date: new Date(trans.fecha).toLocaleDateString(),
@@ -33,19 +37,25 @@ export default function Comisiones() {
                     product: trans.producto
                 }));
 
-                const transformedEarnings = response.data.resumen.map(earn => ({
+                const transformedEarnings = response.data.resumen.map(earn => {
+                    const [year, rawMonth] = earn.mes.split("-");
+                    const mesFormateado = `${year}-${rawMonth.padStart(2, "0")}`;
 
-
-                    responsible: earn.responsable,
-                    month: earn.mes,
-                    salesCount: earn.totalVentas,
-                    cashCollected: earn.totalCashCollected,
-                    currentEarnings: earn.ganancia,
-                    commissionToSubtract: 0,
-                    commissionToAdd: 0,
-                    products: earn.productos
-                }));
-
+                    return {
+                        responsable: earn.responsable,
+                        mes: mesFormateado, 
+                        totalVentas: earn.totalVentas,
+                        totalVentasMEG: earn.totalVentasMEG ?? 0,
+                        totalVentasClub: earn.totalVentasClub ?? 0,
+                        totalCashCollectedMEG: earn.totalCashCollectedMEG || 0,
+                        totalCashCollectedClub: earn.totalCashCollectedClub || 0,
+                        totalCashCollected: earn.totalCashCollected,
+                        ganancia: earn.ganancia,
+                        productos: earn.productos,
+                        commissionToSubtract: 0,
+                        commissionToAdd: 0,
+                    };
+                });
 
                 const transformedRates = response.data.ajustes.map(ajuste => ({
                     type: ajuste.ajuste,
@@ -66,23 +76,24 @@ export default function Comisiones() {
 
         fetchComisionesData();
     }, []);
-
+   
     // Obtener meses únicos para el filtro
     const uniqueMonths = useMemo(() => {
-        return [...new Set(earnings.map(e => e.month))]
-            .sort()
-            .reverse();
+        const mesesRaw = earnings.map(e => e.mes); 
+        const mesesClean = mesesRaw.map(m => m.trim());
+        const mesesSet = [...new Set(mesesClean)];
+        return mesesSet.sort().reverse();
     }, [earnings]);
+
 
     // Filtrar ganancias
     const filteredEarnings = useMemo(() => {
-        console.log("Filtrando por mes:", monthFilter); // Log para depuración
         return earnings.filter(earn => {
-            console.log("Comparando:", earn.month, monthFilter); // Log para depuración
-            return (monthFilter === '' || earn.month === monthFilter) &&
-                (responsibleFilter === '' || earn.responsible.toLowerCase().includes(responsibleFilter.toLowerCase()));
+            return (monthFilter === '' || earn.mes === monthFilter) &&
+                (responsibleFilter === '' || earn.responsable.toLowerCase().includes(responsibleFilter.toLowerCase()));
         });
     }, [earnings, monthFilter, responsibleFilter]);
+
 
     // Filtrar transacciones
     const filteredTransactions = useMemo(() => {
@@ -152,10 +163,19 @@ export default function Comisiones() {
         );
     }
 
-    const indexOfLastItem = currentPageCloser * itemsPerPageCloser;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPageCloser;
-    const currentItems = filteredEarnings.slice(indexOfFirstItem, indexOfLastItem);
+
+    const indexOfLastEarning = currentPageCloser * itemsPerPageCloser;
+    const indexOfFirstEarning = indexOfLastEarning - itemsPerPageCloser;
+    const currentItems = filteredEarnings.slice(indexOfFirstEarning, indexOfLastEarning);
     const totalPagesCloser = Math.ceil(filteredEarnings.length / itemsPerPageCloser);
+    const formatUSD = (value) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2
+        }).format(value);
+    };
+
 
     return (
 
@@ -171,9 +191,12 @@ export default function Comisiones() {
                     >
                         <option value="">Todos los meses</option>
                         {uniqueMonths.map(month => {
-                            // Usamos la misma forma de crear la fecha que en la tabla
-                            const monthDate = new Date(`${month}-01`);
-                            const label = monthDate.toLocaleString('es', { month: 'long', year: 'numeric' }).toUpperCase();
+                            const [year, monthNum] = month.split("-");
+                            const monthDate = new Date(Number(year), Number(monthNum) - 1);
+                            const label = monthDate.toLocaleDateString('es-AR', {
+                                month: 'long',
+                                year: 'numeric'
+                            }).toUpperCase();
 
                             return (
                                 <option key={month} value={month}>
@@ -181,6 +204,8 @@ export default function Comisiones() {
                                 </option>
                             );
                         })}
+
+
 
 
                     </select>
@@ -215,27 +240,61 @@ export default function Comisiones() {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mes</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsable</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cant Ventas</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cash collected</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ventas</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ventas MEG</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ventas Club</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cash Collected MEG</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cash Collected CLUB</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cash Collected</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ganancia</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Productos</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {currentItems.map((earn, index) => (
+                            {currentItems.map((item, index) => (
                                 <tr key={index}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {new Date(`${earn.month}-01`).toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase()}
+                                        {(() => {
+                                            const [year, month] = item.mes.split("-");
+                                            const date = new Date(Number(year), Number(month) - 1);
+                                            return date.toLocaleDateString('es-AR', {
+                                                month: 'long',
+                                                year: 'numeric'
+                                            }).toUpperCase();
+                                        })()}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{earn.responsible}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{earn.salesCount}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${earn.cashCollected.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${earn.currentEarnings.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.responsable}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.totalVentas}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.totalVentasMEG}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.totalVentasClub}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {earn.products && earn.products.map(p =>
-                                            `${p.producto} (${p.cantidad})`
-                                        ).join(', ')}
+                                        {formatUSD(item.totalCashCollectedMEG)}
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {formatUSD(item.totalCashCollectedClub)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {formatUSD(item.totalCashCollected)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {formatUSD(item.ganancia)}
+                                    </td>
+
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <details className="group">
+                                            <summary className="cursor-pointer text-blue-600 hover:underline">
+                                                Ver productos
+                                            </summary>
+                                            <ul className="mt-2 list-disc list-inside text-gray-700">
+                                                {item.productos?.map((p, idx) => (
+                                                    <li key={idx}>
+                                                        {p.producto} ({p.cantidad})
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </details>
+                                    </td>
+
                                 </tr>
                             ))}
                         </tbody>
@@ -246,8 +305,9 @@ export default function Comisiones() {
                 <div className="mt-4 flex items-center justify-between">
                     <div className="flex items-center">
                         <span className="text-sm text-gray-700">
-                            Mostrando {filteredEarnings.length > 0 ? indexOfFirstItem + 1 : 0} a {Math.min(indexOfLastItem, filteredEarnings.length)} de {filteredEarnings.length} registros
+                            Mostrando {filteredEarnings.length > 0 ? indexOfFirstEarning + 1 : 0} a {Math.min(indexOfLastEarning, filteredEarnings.length)} de {filteredEarnings.length} registros
                         </span>
+
                         <div className="ml-4">
                             <select
                                 className="border rounded px-2 py-1 text-sm"

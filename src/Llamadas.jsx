@@ -110,7 +110,7 @@ export default function SalesMetricsTable() {
                 if (!clientRecords[monthYear][clientName]) {
                   clientRecords[monthYear][clientName] = [];
                 }
-  
+
                 clientRecords[monthYear][clientName].push({
                   ...item,
                   timestamp: itemTimestamp,
@@ -134,7 +134,7 @@ export default function SalesMetricsTable() {
                 intervalosVenta: [],
               };
             }
-  
+
             Object.entries(clients).forEach(([clientName, records]) => {
               // Ordenar registros por fecha
               records.sort((a, b) => a.timestamp - b.timestamp);
@@ -169,7 +169,7 @@ export default function SalesMetricsTable() {
               if (latestRecord["Aplica?"] === "Aplica") {
                 acc[monthYear]["Aplica?"] += 1;
               }
-  
+
               // Procesar el resto de métricas normalmente
               records.forEach((record) => {
                 acc[monthYear]["Llamadas efectuadas"] += record["Llamadas efectuadas"] || 0;
@@ -226,7 +226,7 @@ export default function SalesMetricsTable() {
           return dateB - dateA;
         });
 
-  
+
         setMonthlyData(sortedMonthlyEntries);
         setIsLoading(false)
 
@@ -236,7 +236,7 @@ export default function SalesMetricsTable() {
         const validOrigins = [...new Set(filteredData.map((item) => item.Origen).filter(Boolean))]
         setAvailableOrigins(validOrigins);
 
-    
+
 
         setDebugInfo(JSON.stringify(filteredByCloserAndOrigin[0] || {}, null, 2));
       } catch (error) {
@@ -279,10 +279,10 @@ export default function SalesMetricsTable() {
 
   const handleGoalChange = (month, metricName, value) => {
     setMonthlyGoals((prev) => {
-     
+
       const updatedMonthlyGoals = { ...prev };
 
-      
+
       if (!updatedMonthlyGoals[month]) {
         updatedMonthlyGoals[month] = {
           closer: selectedCloser,
@@ -291,15 +291,15 @@ export default function SalesMetricsTable() {
         };
       }
 
-   
+
       const currentMetrics = updatedMonthlyGoals[month].metrics || [];
 
-    
+
       const metricIndex = currentMetrics.findIndex((m) => m.name === metricName);
 
- 
+
       if (value === "") {
-  
+
         return prev;
       } else if (metricIndex !== -1) {
 
@@ -307,7 +307,7 @@ export default function SalesMetricsTable() {
           index === metricIndex ? { ...metric, goal: Number(value) } : metric
         );
       } else {
- 
+
         updatedMonthlyGoals[month].metrics.push({
           name: metricName,
           goal: Number(value)
@@ -367,7 +367,7 @@ export default function SalesMetricsTable() {
         const response = await fetch(url.toString());
         const result = await response.json();
 
-      
+
 
         const formattedGoals = result.reduce((acc, item) => {
           if (item?.month) {
@@ -375,7 +375,7 @@ export default function SalesMetricsTable() {
               closer: item.closer || selectedCloser || "all",
               origin: item.origin || selectedOrigin || "all",
               metrics: item.metrics || [
-                
+
                 { name: "Llamadas Agendadas", goal: 0 },
                 { name: "Llamadas efectuadas", goal: 0 },
                 { name: "Venta Meg", goal: 0 },
@@ -393,7 +393,7 @@ export default function SalesMetricsTable() {
             ...formattedGoals
           };
 
-          
+
           console.log("Estado final de monthlyGoals:", merged);
 
           return merged;
@@ -696,6 +696,25 @@ export default function SalesMetricsTable() {
                       </div>
                     </div>
                   </div>
+
+                  {/* 🧾 Ventas por Submes */}
+                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+                    <details className="group">
+                      <summary className="cursor-pointer text-[#4c4c4c] hover:underline flex justify-between items-center">
+                        <span className="text-md font-semibold">Ventas por mes</span>
+                        <span className="transition-transform group-open:rotate-90">▶</span>
+                      </summary>
+
+                      <ul className="mt-2 pl-4 text-gray-700 text-sm list-disc">
+                        {Object.entries(totals.ventasPorMes || {}).map(([subMonth, count], idx) => (
+                          <li key={idx}>
+                            {formatMonthYear(subMonth)}: <span className="font-semibold">{count}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </div>
+
 
                   {/* 🟢 Intervalo de Ventas */}
                   <div className="bg-gray-50 p-1 rounded-md border border-gray-200">

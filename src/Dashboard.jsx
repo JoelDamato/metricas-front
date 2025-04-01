@@ -9,7 +9,10 @@ import { ToastContainer, toast } from 'react-toastify';
 
 
 const DashboardTable = () => {
-  const API_URL = "https://metricas-back.onrender.com/dashboard";
+  const API_URL = process.env.NODE_ENV === "production"
+  ? "https://metricas-back.onrender.com/"
+  : "http://localhost:3000/" 
+
 
   const [data, setData] = useState([]);
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
@@ -39,7 +42,7 @@ const DashboardTable = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(API_URL);
+        const response = await axios.get(`${API_URL}dashboard`);
         setData(response.data);
         const uniqueClosers = [...new Set(response.data.map(item => item["Closer Actual"]))];
         setClosers(uniqueClosers);
@@ -350,34 +353,15 @@ const DashboardTable = () => {
     });
   
     const resumenPorCloser = {};
-    const registrosPorCliente = {};
   
-    // Organizar registros por cliente
+    // Primera pasada: procesar todas las filas para contabilizar métricas por closer
     filteredData.forEach((row) => {
-
-      const clienteID = row["Nombre cliente"];
-      if (!registrosPorCliente[clienteID]) registrosPorCliente[clienteID] = [];
-      registrosPorCliente[clienteID].push(row);
-    });
-
-    // Ordenar registros por fecha
-    Object.keys(registrosPorCliente).forEach((clienteID) => {
-      registrosPorCliente[clienteID].sort((a, b) => new Date(a["Fecha correspondiente"]) - new Date(b["Fecha correspondiente"]));
-    });
-
+      // Usar "Closer Actual" si está disponible, de lo contrario usar "Responsable"
+      const closer = row["Closer Actual"] || row["Responsable"];
   
-    // Filtrar solo los agendamientos
-    const agendamientos = filteredData.filter((row) => row["Agenda"] === 1);
-
-    // Procesar cada agendamiento
-    agendamientos.forEach((row) => {
-      const fechaAgendamiento = new Date(row["Fecha correspondiente"]);
-      const clienteID = row["Nombre cliente"];
-      const closer = row["Closer Actual"] || row["Responsable"]; // Usar "Responsable" si "Closer Actual" es null
-
-  
+      // Ignorar registros sin closer o con "Sin Closer"
       if (!closer || closer === "Sin Closer") return;
-
+  
       // Inicializar el resumen para el closer si no existe
       if (!resumenPorCloser[closer]) {
         resumenPorCloser[closer] = {
@@ -391,64 +375,38 @@ const DashboardTable = () => {
           asistenciasConVenta: 0,
         };
       }
-
   
-      // Contar el agendamiento
-      resumenPorCloser[closer].agendas++;
+      // Contar agendas
+      if (row["Agenda"] === 1) {
+        resumenPorCloser[closer].agendas++;
+      }
   
-
-      // Verificar si el registro actual cumple con las condiciones de descalificación
-      if (row["Agenda"] == 1 && row["Aplica?"] == "No aplica") {
+      // Contar descalificadas
+      if (row["Agenda"] === 1 && row["Aplica?"] === "No aplica") {
         resumenPorCloser[closer].descalificadas++;
       }
-
-      // Obtener registros posteriores al agendamiento
-      const registrosPosteriores = registrosPorCliente[clienteID]?.filter(
-        (r) => new Date(r["Fecha correspondiente"]) > fechaAgendamiento
-      ) || [];
-
-      // Verificar si hay algún registro posterior que cumpla con las condiciones de descalificación
-      const descalificadaPosterior = registrosPosteriores.some(
-        (r) => r["Agenda"] == 1 && r["Aplica?"] == "No aplica"
-      );
-
-      // Si se encuentra una descalificación posterior, incrementar el contador
-      if (descalificadaPosterior) {
-        resumenPorCloser[closer].descalificadas++;
+  
+      // Contar asistencias y recuperados (basado en el valor de "Asistio?")
+      if (row["Asistio?"] === "Asistió") {
+        resumenPorCloser[closer].asistencias++;
+        
+        // Si además tiene una venta, contar como asistencia con venta
+        if (row["Venta Meg"] === 1) {
+          resumenPorCloser[closer].asistenciasConVenta++;
+        }
+      } else if (row["Asistio?"] === "Recuperado") {
+        resumenPorCloser[closer].recuperados++;
+      } else if (row["Asistio?"] && row["Asistio?"] !== "Asistió" && row["Asistio?"] !== "Recuperado") {
+        // Contar inasistencias - solo si hay un valor y no es "Asistió" ni "Recuperado"
+        resumenPorCloser[closer].inasistencias++;
       }
-
-      // Obtener el último registro posterior
-      const ultimoRegistro = registrosPosteriores.length > 0
-        ? registrosPosteriores[registrosPosteriores.length - 1]
-        : null;
-
-      // Procesar el último registro posterior
-      if (ultimoRegistro) {
-        // Contar asistencias
-        if (ultimoRegistro["Asistio?"] === "Asistió") {
-          resumenPorCloser[closer].asistencias++;
-          if (ultimoRegistro["Venta Meg"] === 1) {
-            resumenPorCloser[closer].asistenciasConVenta++;
-          }
-        }
-
-        // Contar recuperados
-        if (ultimoRegistro["Asistio?"] === "Recuperado") {
-          resumenPorCloser[closer].recuperados++;
-        }
-
-        // Contar inasistencias
-        if (ultimoRegistro["Asistio?"] !== "Asistió" && ultimoRegistro["Asistio?"] !== "Recuperado") {
-          resumenPorCloser[closer].inasistencias++;
-        }
-
-        // Contar ventas cerradas
-        if (ultimoRegistro["Venta Meg"] === 1) {
-          resumenPorCloser[closer].cerradas++;
-        }
+  
+      // Contar ventas cerradas
+      if (row["Venta Meg"] === 1) {
+        resumenPorCloser[closer].cerradas++;
       }
     });
-
+  
     // Calcular porcentajes
     Object.keys(resumenPorCloser).forEach((closer) => {
       const stats = resumenPorCloser[closer];
@@ -461,11 +419,9 @@ const DashboardTable = () => {
         "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%",
       };
     });
-
   
     setResumen(resumenPorCloser);
-  
-  }, [data, monthFilter]); // Añadir monthFilter como dependencia
+  }, [data, monthFilter]);
 
 
 
@@ -512,7 +468,7 @@ const DashboardTable = () => {
   const fetchObjetivosCloser = async (closer, monthFilter) => {
 
     try {
-      const response = await axios.get("http://localhost:3000/objetivos-closer", {
+      const response = await axios.get(`${API_URL}objetivos-closer`, {
         params: { closer, monthFilter },
       });
       console.log("response objetivos:", response.data);
@@ -543,7 +499,7 @@ const DashboardTable = () => {
         },
       };
 
-      await axios.post("http://localhost:3000/update-objetivo-closer", data, {
+      await axios.post(`${API_URL}update-objetivo-closer`, data, {
         headers: {
           "Content-Type": "application/json",
         },
@@ -687,7 +643,7 @@ const DashboardTable = () => {
               <tbody>
                 {Object.entries(resumen).length > 0 ? (
                   Object.entries(resumen)
-                    .filter(([closer]) => closer !== "Sin Closer") // 🔹 Ocultar "Sin Closer"
+                    .filter(([closer]) => closer !== "Sin Closer")
                     .map(([closer, datos]) => {
                       const percentages = datos.percentages || {};
 
