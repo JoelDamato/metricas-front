@@ -10,8 +10,10 @@ import { ToastContainer, toast } from 'react-toastify';
 
 const DashboardTable = () => {
   const API_URL = process.env.NODE_ENV === "production"
-  ? "https://metricas-back.onrender.com/"
-  : "http://localhost:3000/" 
+    ? "https://metricas-back.onrender.com/"
+    : "https://metricas-back.onrender.com/"
+
+
 
 
   const [data, setData] = useState([]);
@@ -60,9 +62,9 @@ const DashboardTable = () => {
       new Date(row["Fecha correspondiente"]).toISOString().slice(0, 7) === monthFilter &&
       (closerFilter ? row["Closer Actual"] === closerFilter : true)
     );
-  
+
     const groupedByCloser = {};
-  
+
     filtered.forEach((row) => {
       const closer = row["Closer Actual"];
       if (!groupedByCloser[closer]) {
@@ -111,7 +113,7 @@ const DashboardTable = () => {
         groupedByCloser[closer]["Cierre/Asistencias"] += 1;
       }
     });
-  
+
 
 
     Object.keys(groupedByCloser).forEach((closer) => {
@@ -127,7 +129,7 @@ const DashboardTable = () => {
         "Aplican": ((stats["Aplican"] + stats["No aplican"] > 0 ? stats["Aplican"] / (stats["Aplican"] + stats["No aplican"]) : 0) * 100).toFixed(2) + "%",
       };
     });
-  
+
 
 
     setTotals(groupedByCloser);
@@ -143,7 +145,7 @@ const DashboardTable = () => {
         ...prev[closer],
         [metrica]: {
           ...prev[closer]?.[metrica],
-          ...value, 
+          ...value,
         },
       },
     }));
@@ -337,31 +339,31 @@ const DashboardTable = () => {
     });
 
   };
-  console.log(monthFilter)
 
 
 
-  
+
+
   useEffect(() => {
     if (data.length === 0) return;
-  
+
     // Filtrar los datos por el mes seleccionado
     const filteredData = data.filter((row) => {
       const fecha = new Date(row["Fecha correspondiente"]);
       const monthYear = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
       return monthYear === monthFilter;
     });
-  
+
     const resumenPorCloser = {};
-  
+
     // Primera pasada: procesar todas las filas para contabilizar métricas por closer
     filteredData.forEach((row) => {
       // Usar "Closer Actual" si está disponible, de lo contrario usar "Responsable"
       const closer = row["Closer Actual"] || row["Responsable"];
-  
+
       // Ignorar registros sin closer o con "Sin Closer"
       if (!closer || closer === "Sin Closer") return;
-  
+
       // Inicializar el resumen para el closer si no existe
       if (!resumenPorCloser[closer]) {
         resumenPorCloser[closer] = {
@@ -375,21 +377,21 @@ const DashboardTable = () => {
           asistenciasConVenta: 0,
         };
       }
-  
+
       // Contar agendas
       if (row["Agenda"] === 1) {
         resumenPorCloser[closer].agendas++;
       }
-  
+
       // Contar descalificadas
       if (row["Agenda"] === 1 && row["Aplica?"] === "No aplica") {
         resumenPorCloser[closer].descalificadas++;
       }
-  
+
       // Contar asistencias y recuperados (basado en el valor de "Asistio?")
       if (row["Asistio?"] === "Asistió") {
         resumenPorCloser[closer].asistencias++;
-        
+
         // Si además tiene una venta, contar como asistencia con venta
         if (row["Venta Meg"] === 1) {
           resumenPorCloser[closer].asistenciasConVenta++;
@@ -400,13 +402,13 @@ const DashboardTable = () => {
         // Contar inasistencias - solo si hay un valor y no es "Asistió" ni "Recuperado"
         resumenPorCloser[closer].inasistencias++;
       }
-  
+
       // Contar ventas cerradas
       if (row["Venta Meg"] === 1) {
         resumenPorCloser[closer].cerradas++;
       }
     });
-  
+
     // Calcular porcentajes
     Object.keys(resumenPorCloser).forEach((closer) => {
       const stats = resumenPorCloser[closer];
@@ -419,7 +421,7 @@ const DashboardTable = () => {
         "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%",
       };
     });
-  
+
     setResumen(resumenPorCloser);
   }, [data, monthFilter]);
 
@@ -429,7 +431,7 @@ const DashboardTable = () => {
     if (closerFilter && monthFilter) {
       fetchObjetivosCloser(closerFilter, monthFilter).then((data) => {
         if (data && Object.keys(data.metricas).length > 0) {
-          const metricas = data.metricas; 
+          const metricas = data.metricas;
 
 
           setObjetivosCloser({ metricas });
@@ -438,7 +440,7 @@ const DashboardTable = () => {
             ...prevInputs,
             [closerFilter]: Object.keys(metricas).reduce((acc, metrica) => {
               acc[metrica] = {
-                objetivo: metricas[metrica]?.objetivo ?? "", 
+                objetivo: metricas[metrica]?.objetivo ?? "",
                 base: metricas[metrica]?.base ?? "",
               };
               return acc;
@@ -471,7 +473,7 @@ const DashboardTable = () => {
       const response = await axios.get(`${API_URL}objetivos-closer`, {
         params: { closer, monthFilter },
       });
-      console.log("response objetivos:", response.data);
+  
       return response.data;
     } catch (error) {
       console.error("Error:", error);
@@ -592,7 +594,7 @@ const DashboardTable = () => {
       <div className="w-full  py-6 max-w-7xl mx-auto ">
 
         <h3 className="text-lg w-full py-2 font-semibold text-gray-700 text-start">Resumen por Closer</h3>
-        { monthFilter && <h2 className="text-lg w-full py-2 font-semibold text-gray-700 text-start" >Mes correspondiente: {monthFilter} </h2> }
+        {monthFilter && <h2 className="text-lg w-full py-2 font-semibold text-gray-700 text-start" >Mes correspondiente: {monthFilter} </h2>}
         <div className="w-full md:max-w-6xl mx-auto overflow-x-auto">
           {isLoading ? (
             // 🔹 Skeleton Loader mientras los datos están cargando
@@ -637,47 +639,98 @@ const DashboardTable = () => {
                   <th className="p-2 font-bold">%</th>
                   <th className="p-2 font-bold w-40">Cierre S/Asistencia %</th>
 
-
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(resumen).length > 0 ? (
-                  Object.entries(resumen)
-                    .filter(([closer]) => closer !== "Sin Closer")
-                    .map(([closer, datos]) => {
-                      const percentages = datos.percentages || {};
+                  <>
+                    {Object.entries(resumen)
+                      .filter(([closer]) => closer !== "Sin Closer")
+                      .map(([closer, datos]) => {
+                        const percentages = datos.percentages || {};
+
+                        return (
+                          <tr key={closer} className="border-b hover:bg-gray-100 transition text-center">
+                            <td className="p-2 text-gray-800 text-left font-semibold">{closer}</td>
+                            <td className="p-2 text-gray-700">{datos.agendas || 0}</td>
+                            <td className="p-2 text-gray-700">{datos.recuperados || 0}</td>
+                            <td className="p-2 text-green-600 font-semibold">
+                              {percentages["Recuperado"] || "0%"}
+                            </td>
+                            <td className="p-2 text-gray-700">{datos.asistencias || 0}</td>
+                            <td className="p-2 text-blue-600 font-semibold">
+                              {percentages["Asistencia"] || "0%"}
+                            </td>
+                            <td className="p-2 text-gray-700">{datos.inasistencias || 0}</td>
+                            <td className="p-2 text-red-600 font-semibold">
+                              {percentages["No Asiste"] || "0%"}
+                            </td>
+                            <td className="p-2 text-gray-700">{datos.descalificadas || 0}</td>
+                            <td className="p-2 text-gray-500 font-semibold">
+                              {percentages["No Aplican"] || "0%"}
+                            </td>
+                            <td className="p-2 text-gray-700">{datos.cerradas || 0}</td>
+                            <td className="p-2 text-purple-600 font-semibold">
+                              {percentages["Cerradas"] || "0%"}
+                            </td>
+                            <td className="p-2 text-orange-600 font-semibold">
+                              {percentages["S/Asistencia"] || "0%"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                    {/* Fila de totales */}
+                    {(() => {
+                      // Calcular totales
+                      const totales = Object.entries(resumen)
+                        .filter(([closer]) => closer !== "Sin Closer")
+                        .reduce((acc, [_, datos]) => {
+                          acc.agendas += (datos.agendas || 0);
+                          acc.recuperados += (datos.recuperados || 0);
+                          acc.asistencias += (datos.asistencias || 0);
+                          acc.inasistencias += (datos.inasistencias || 0);
+                          acc.descalificadas += (datos.descalificadas || 0);
+                          acc.cerradas += (datos.cerradas || 0);
+                          return acc;
+                        }, {
+                          agendas: 0,
+                          recuperados: 0,
+                          asistencias: 0,
+                          inasistencias: 0,
+                          descalificadas: 0,
+                          cerradas: 0
+                        });
+
+                      // Calcular porcentajes
+                      const totalPercentages = {
+                        "Recuperado": totales.agendas ? `${((totales.recuperados / totales.agendas) * 100).toFixed(1)}%` : "0%",
+                        "Asistencia": totales.agendas ? `${((totales.asistencias / totales.agendas) * 100).toFixed(1)}%` : "0%",
+                        "No Asiste": totales.agendas ? `${((totales.inasistencias / totales.agendas) * 100).toFixed(1)}%` : "0%",
+                        "No Aplican": totales.agendas ? `${((totales.descalificadas / totales.agendas) * 100).toFixed(1)}%` : "0%",
+                        "Cerradas": totales.agendas ? `${((totales.cerradas / totales.agendas) * 100).toFixed(1)}%` : "0%",
+                        "S/Asistencia": totales.asistencias ? `${((totales.cerradas / totales.asistencias) * 100).toFixed(1)}%` : "0%"
+                      };
 
                       return (
-                        <tr key={closer} className="border-b hover:bg-gray-100 transition text-center">
-                          <td className="p-2 text-gray-800 text-left font-semibold">{closer}</td>
-                          <td className="p-2 text-gray-700">{datos.agendas || 0}</td>
-                          <td className="p-2 text-gray-700">{datos.recuperados || 0}</td>
-                          <td className="p-2 text-green-600 font-semibold">
-                            {percentages["Recuperado"] || "0%"}
-                          </td>
-                          <td className="p-2 text-gray-700">{datos.asistencias || 0}</td>
-                          <td className="p-2 text-blue-600 font-semibold">
-                            {percentages["Asistencia"] || "0%"}
-                          </td>
-                          <td className="p-2 text-gray-700">{datos.inasistencias || 0}</td>
-                          <td className="p-2 text-red-600 font-semibold">
-                            {percentages["No Asiste"] || "0%"}
-                          </td>
-                          <td className="p-2 text-gray-700">{datos.descalificadas || 0}</td>
-                          <td className="p-2 text-gray-500 font-semibold">
-                            {percentages["No Aplican"] || "0%"}
-                          </td>
-                          <td className="p-2 text-gray-700">{datos.cerradas || 0}</td>
-                          <td className="p-2 text-purple-600 font-semibold">
-                            {percentages["Cerradas"] || "0%"}
-                          </td>
-
-                          <td className="p-2 text-orange-600 font-semibold">
-                            {percentages["S/Asistencia"] || "0%"}
-                          </td>
+                        <tr className="bg-gray-200 font-bold text-center border-t-2 border-gray-400">
+                          <td className="p-2 text-gray-800 text-left">TOTAL</td>
+                          <td className="p-2 text-gray-700">{totales.agendas}</td>
+                          <td className="p-2 text-gray-700">{totales.recuperados}</td>
+                          <td className="p-2 text-green-600">{totalPercentages["Recuperado"]}</td>
+                          <td className="p-2 text-gray-700">{totales.asistencias}</td>
+                          <td className="p-2 text-blue-600">{totalPercentages["Asistencia"]}</td>
+                          <td className="p-2 text-gray-700">{totales.inasistencias}</td>
+                          <td className="p-2 text-red-600">{totalPercentages["No Asiste"]}</td>
+                          <td className="p-2 text-gray-700">{totales.descalificadas}</td>
+                          <td className="p-2 text-gray-500">{totalPercentages["No Aplican"]}</td>
+                          <td className="p-2 text-gray-700">{totales.cerradas}</td>
+                          <td className="p-2 text-purple-600">{totalPercentages["Cerradas"]}</td>
+                          <td className="p-2 text-orange-600">{totalPercentages["S/Asistencia"]}</td>
                         </tr>
                       );
-                    })
+                    })()}
+                  </>
                 ) : (
                   <tr>
                     <td colSpan="14" className="p-3 text-gray-600 text-center">
@@ -708,7 +761,7 @@ const DashboardTable = () => {
                 <td className="p-3 text-gray-600 font-bold">Porcentaje</td>
                 <td className="p-3 text-gray-600 font-bold">Objetivo</td>
                 <td className="p-3 text-gray-600 font-bold">Base</td>
-                <td className="p-3 text-gray-600 font-bold">Acciones</td> 
+                <td className="p-3 text-gray-600 font-bold">Acciones</td>
               </tr>
 
               {Object.entries(totals[closerFilter])
@@ -794,7 +847,7 @@ const DashboardTable = () => {
                           <button
                             className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center justify-center"
                             onClick={() => handleUpdate(closerFilter, key)}
-                            disabled={updatingMetric === key} 
+                            disabled={updatingMetric === key}
                           >
                             {updatingMetric === key ? (
                               <>

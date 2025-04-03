@@ -6,12 +6,27 @@ const Dashboard = () => {
 
   const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/llamadas"
-    : "http://localhost:3000/llamadas";
+    : "https://metricas-back.onrender.com/llamadas";
 
   const monthNames = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
+
+//   dashboard:
+//  tabla de closer generales  abajo poner los totales ---Listo, falta confirma si dejo o saco porcentajes
+
+// comisiones:
+// -sistemas de comisiones. acomodar cash collected y conciliar
+// -que los porcentajes se puedan editar. ------- falta conciliar que los datos de la base de datos lleguen bien
+// ------------------------------
+// llamadas:
+// -agregar objetivos a cash collected porcentual.
+// -agregar en el desplegables todas las ventas del mes 
+// las que faltan para completar el mes.
+// -revisar llamadas por diferentes origenes (filtro)
+
+
 
   useEffect(() => {
     const fetchData = async () => {

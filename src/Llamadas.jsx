@@ -7,7 +7,7 @@ export default function SalesMetricsTable() {
 
   const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/metricas"
-    : "http://localhost:3000/metricas"
+    : "https://metricas-back.onrender.com/metricas"
 
 
   const [monthlyData, setMonthlyData] = useState([])
@@ -56,73 +56,14 @@ export default function SalesMetricsTable() {
 
         // Agrupar datos después del filtrado
         const groupDataByMonth = (data) => {
-          // Primero, encontrar todos los meses de agendamiento para cada cliente
-          const clientScheduleMonths = {};
-          data.forEach((item) => {
-            if (item.Agenda === 1) {
-              const date = new Date(item["Fecha correspondiente"]);
-              const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-              const clientName = item["Nombre cliente"];
-
-              if (!clientScheduleMonths[clientName]) {
-                clientScheduleMonths[clientName] = [];
-              }
-              clientScheduleMonths[clientName].push({
-                monthYear,
-                date: date.getTime(),
-              });
-            }
-          });
-
-          // Ordenar los meses de agendamiento por fecha para cada cliente
-          Object.keys(clientScheduleMonths).forEach((clientName) => {
-            clientScheduleMonths[clientName].sort((a, b) => a.date - b.date);
-          });
-
-
           const acc = {};
-          const clientRecords = {};
 
           data.forEach((item) => {
-            const clientName = item["Nombre cliente"];
-            const itemDate = new Date(item["Fecha correspondiente"]);
-            const itemTimestamp = itemDate.getTime();
+            const ventaDate = new Date(item["Fecha correspondiente"]);
+            const ventaMonthYear = `${ventaDate.getFullYear()}-${String(ventaDate.getMonth() + 1).padStart(2, "0")}`;
 
-            if (clientScheduleMonths[clientName]) {
-              // Encontrar el período de agendamiento correspondiente
-              const scheduleInfo = clientScheduleMonths[clientName].find((schedule, index) => {
-                const isLastSchedule = index === clientScheduleMonths[clientName].length - 1;
-                const nextSchedule = !isLastSchedule ? clientScheduleMonths[clientName][index + 1] : null;
-
-                return isLastSchedule
-                  ? itemTimestamp >= schedule.date
-                  : itemTimestamp >= schedule.date && itemTimestamp < nextSchedule.date;
-              });
-
-
-              if (scheduleInfo) {
-                const monthYear = scheduleInfo.monthYear;
-
-
-                if (!clientRecords[monthYear]) {
-                  clientRecords[monthYear] = {};
-                }
-                if (!clientRecords[monthYear][clientName]) {
-                  clientRecords[monthYear][clientName] = [];
-                }
-
-                clientRecords[monthYear][clientName].push({
-                  ...item,
-                  timestamp: itemTimestamp,
-                });
-              }
-            }
-          });
-
-          // Procesar los registros agrupados
-          Object.entries(clientRecords).forEach(([monthYear, clients]) => {
-            if (!acc[monthYear]) {
-              acc[monthYear] = {
+            if (!acc[ventaMonthYear]) {
+              acc[ventaMonthYear] = {
                 Agenda: 0,
                 "Aplica?": 0,
                 "Llamadas efectuadas": 0,
@@ -130,71 +71,42 @@ export default function SalesMetricsTable() {
                 Monto: 0,
                 "Cash collected": 0,
                 ventasPorMes: {},
-
                 intervalosVenta: [],
               };
             }
 
-            Object.entries(clients).forEach(([clientName, records]) => {
-              // Ordenar registros por fecha
-              records.sort((a, b) => a.timestamp - b.timestamp);
+            // Agendamiento por cliente
+            const clientName = item["Nombre cliente"];
+            const isAgendado = item.Agenda === 1;
+            const isVenta = item["Venta Meg"] > 0;
+            const ventaClub = item["Venta Club"] === 1;
 
+            if (isAgendado) acc[ventaMonthYear].Agenda += 1;
+            if (item["Aplica?"] === "Aplica") acc[ventaMonthYear]["Aplica?"] += 1;
 
-              // Encontrar la primera fecha de agendamiento
-              const primerAgendamiento = records.find((record) => record.Agenda === 1);
+            acc[ventaMonthYear]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
+            acc[ventaMonthYear]["Venta Meg"] += item["Venta Meg"] || 0;
 
-              // Encontrar la fecha de venta si existe
-              const registroVenta = records.find((record) => record["Venta Meg"] > 0);
+            if (!ventaClub) {
+              acc[ventaMonthYear]["Monto"] += item["Precio"] || 0;
+              acc[ventaMonthYear]["Cash collected"] += item["Cash collected total"] || 0;
+            }
 
+            // Agrupación por mes de agendamiento
+            if (isVenta) {
+              const agendamientoDate = data.find(d => d["Nombre cliente"] === clientName && d.Agenda === 1);
+              const agendamientoMonthYear = agendamientoDate
+                ? `${new Date(agendamientoDate["Fecha correspondiente"]).getFullYear()}-${String(new Date(agendamientoDate["Fecha correspondiente"]).getMonth() + 1).padStart(2, "0")}`
+                : "Sin agendamiento";
 
-              // Si hay tanto agendamiento como venta, calcular el intervalo
-              if (primerAgendamiento && registroVenta) {
-                const diasIntervalo = Math.floor(
-                  (new Date(registroVenta["Fecha correspondiente"]).getTime() -
-                    new Date(primerAgendamiento["Fecha correspondiente"]).getTime()) /
-
-                  (1000 * 60 * 60 * 24)
-                );
-                acc[monthYear].intervalosVenta.push(diasIntervalo);
+              if (!acc[ventaMonthYear].ventasPorMes[agendamientoMonthYear]) {
+                acc[ventaMonthYear].ventasPorMes[agendamientoMonthYear] = 0;
               }
 
-              // contar Agenda
-
-              const hasAgenda = records.some((record) => record.Agenda === 1);
-              if (hasAgenda) {
-                acc[monthYear].Agenda += 1;
-              }
-
-              const latestRecord = records[0];
-              if (latestRecord["Aplica?"] === "Aplica") {
-                acc[monthYear]["Aplica?"] += 1;
-              }
-
-              // Procesar el resto de métricas normalmente
-              records.forEach((record) => {
-                acc[monthYear]["Llamadas efectuadas"] += record["Llamadas efectuadas"] || 0;
-                acc[monthYear]["Venta Meg"] += record["Venta Meg"] || 0;
-
-                // Registrar ventas por mes
-                if (record["Venta Meg"] > 0) {
-                  const ventaDate = new Date(record["Fecha correspondiente"]);
-                  const ventaMonthYear = `${ventaDate.getFullYear()}-${String(ventaDate.getMonth() + 1).padStart(2, "0")}`;
-
-                  if (!acc[monthYear].ventasPorMes[ventaMonthYear]) {
-                    acc[monthYear].ventasPorMes[ventaMonthYear] = 0;
-                  }
-                  acc[monthYear].ventasPorMes[ventaMonthYear] += record["Venta Meg"];
-                }
-
-                if (record["Venta Club"] !== 1) {
-                  acc[monthYear]["Monto"] += record["Precio"] || 0;
-                  acc[monthYear]["Cash collected"] += record["Cash collected total"] || 0;
-                }
-              });
-            });
+              acc[ventaMonthYear].ventasPorMes[agendamientoMonthYear] += item["Venta Meg"];
+            }
           });
 
-          // Calcular el promedio de intervalos para cada mes
           Object.keys(acc).forEach((monthYear) => {
             const intervalos = acc[monthYear].intervalosVenta;
             if (intervalos.length > 0) {
@@ -204,12 +116,17 @@ export default function SalesMetricsTable() {
             } else {
               acc[monthYear].promedioIntervalo = 0;
             }
-
             delete acc[monthYear].intervalosVenta;
+          });
+
+          Object.entries(acc).forEach(([ventaMonth, data]) => {
+            const totalVentas = Object.values(data.ventasPorMes).reduce((a, b) => a + b, 0);
+          
           });
 
           return acc;
         };
+
 
         // Obtener los datos agrupados por mes
         const groupedData = groupDataByMonth(filteredByCloserAndOrigin);
@@ -336,7 +253,7 @@ export default function SalesMetricsTable() {
 
 
     try {
-      const response = await fetch(`http://localhost:3000/update-goal`, {
+      const response = await fetch(`https://metricas-back.onrender.com/update-goal`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -361,7 +278,7 @@ export default function SalesMetricsTable() {
     const fetchGoals = async () => {
       try {
 
-        const url = new URL("http://localhost:3000/goals");
+        const url = new URL("https://metricas-back.onrender.com/goals");
         if (selectedCloser !== "all") url.searchParams.append("selectedCloser", selectedCloser);
         if (selectedOrigin !== "all") url.searchParams.append("selectedOrigin", selectedOrigin);
         const response = await fetch(url.toString());
@@ -394,8 +311,7 @@ export default function SalesMetricsTable() {
           };
 
 
-          console.log("Estado final de monthlyGoals:", merged);
-
+        
           return merged;
         });
 
@@ -443,7 +359,7 @@ export default function SalesMetricsTable() {
   };
 
 
-  console.log("monthly data", monthlyData)
+
   return (
     <div className="p-4">
 
@@ -701,17 +617,21 @@ export default function SalesMetricsTable() {
                   <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
                     <details className="group">
                       <summary className="cursor-pointer text-[#4c4c4c] hover:underline flex justify-between items-center">
-                        <span className="text-md font-semibold">Ventas por mes</span>
+                        <span className="text-md font-semibold">Ventas por mes de agendamiento:</span>
                         <span className="transition-transform group-open:rotate-90">▶</span>
                       </summary>
 
                       <ul className="mt-2 pl-4 text-gray-700 text-sm list-disc">
                         {Object.entries(totals.ventasPorMes || {}).map(([subMonth, count], idx) => (
                           <li key={idx}>
-                            {formatMonthYear(subMonth)}: <span className="font-semibold">{count}</span>
+                            {subMonth === "Sin agendamiento"
+                              ? "Sin fecha de agendamiento"
+                              : formatMonthYear(subMonth)}
+                            : <span className="font-semibold">{count}</span>
                           </li>
                         ))}
                       </ul>
+
                     </details>
                   </div>
 
@@ -766,8 +686,35 @@ export default function SalesMetricsTable() {
                   {/* Cash Collected */}
                   <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-gray-700">Cash Collected</span>
-                      <span className="text-xs font-bold text-gray-700">{formatCurrency(totals["Cash collected"])}</span>
+                      <span className="text-md font-semibold text-gray-700">Cash Collected</span>
+                      <span className="text-md font-bold text-gray-700">{formatCurrency(totals["Cash collected"])}</span>
+                    </div>
+                    <div className="mt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-md text-gray-600">Objetivo (%):</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={
+                            monthlyGoals[month]?.metrics?.find((m) => m.name === "Cash Collected")?.goal || ""
+                          }
+                          onChange={(e) => handleGoalChange(month, "Cash Collected", Math.min(100, Math.max(0, e.target.value)))}
+                          className="border border-gray-300 rounded text-xs w-16 text-right p-0.5 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="mt-0.5 text-xs text-gray-600">
+                        Cumplimiento:{" "}
+                        <span
+                          className={`font-semibold ${totals["Cash collected percentage"] >=
+                            (monthlyGoals[month]?.metrics?.find((m) => m.name === "Cash Collected")?.goal || 0)
+                            ? "text-green-500"
+                            : "text-gray-600"
+                            }`}
+                        >
+                          {totals["Cash collected percentage"] || 0}%
+                        </span>
+                      </div>
                     </div>
                   </div>
 
