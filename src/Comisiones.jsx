@@ -18,7 +18,7 @@ export default function Comisiones() {
 
     const API_BASE_URL = process.env.NODE_ENV === "production"
         ? "https://metricas-back.onrender.com/"
-        : "http://localhost:3000/"
+        : "https://metricas-back.onrender.com/"
 
     // Fetch de datos al montar el componente
     useEffect(() => {
@@ -74,7 +74,7 @@ export default function Comisiones() {
                     };
                 });
 
-               
+
 
                 setTransactions(transformedTransactions);
                 setEarnings(transformedEarnings);
@@ -450,15 +450,46 @@ export default function Comisiones() {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ajustes</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Porcentaje asociado</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Ajustes
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Number
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Porcentaje asociado
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-
+                            <tr>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Cantidad de ventas</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1-4</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8%</td>
+                            </tr>
+                            <tr>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Cantidad de ventas</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">5-14</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">9%</td>
+                            </tr>
+                            <tr>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Cantidad de ventas</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">+15</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10%</td>
+                            </tr>
+                            <tr>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">CLUB</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">SIN OPCION</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">60%</td>
+                            </tr>
+                            <tr>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Autogenda</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">SIN OPCION</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10%</td>
+                            </tr>
                         </tbody>
                     </table>
+
                 </div>
             </div>
 
