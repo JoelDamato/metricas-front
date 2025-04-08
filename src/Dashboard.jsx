@@ -388,21 +388,30 @@ const DashboardTable = () => {
         resumenPorCloser[closer].descalificadas++;
       }
 
-      // Contar asistencias y recuperados (basado en el valor de "Asistio?")
-      if (row["Asistio?"] === "Asistió") {
-        resumenPorCloser[closer].asistencias++;
-
-        // Si además tiene una venta, contar como asistencia con venta
-        if (row["Venta Meg"] === 1) {
-          resumenPorCloser[closer].asistenciasConVenta++;
+      // Contar asistencias y recuperados solo si hubo llamada efectuada
+      if (row["Llamadas efectuadas"] === 1) {
+        if (row["Asistio?"] === "Asistió") {
+          resumenPorCloser[closer].asistencias++;
+          if (row["Venta Meg"] === 1) {
+            resumenPorCloser[closer].asistenciasConVenta++;
+          }
+        } else if (row["Asistio?"] === "Recuperado") {
+          resumenPorCloser[closer].recuperados++;
         }
-      } else if (row["Asistio?"] === "Recuperado") {
-        resumenPorCloser[closer].recuperados++;
-      } else if (row["Asistio?"] && row["Asistio?"] !== "Asistió" && row["Asistio?"] !== "Recuperado") {
-        // Contar inasistencias - solo si hay un valor y no es "Asistió" ni "Recuperado"
-        resumenPorCloser[closer].inasistencias++;
       }
 
+      // Calcular inasistencias después de contar todo lo demás
+      for (const closer in resumenPorCloser) {
+        const resumen = resumenPorCloser[closer];
+        resumen.inasistencias =
+          resumen.agendas -
+          resumen.descalificadas -
+          resumen.asistencias -
+          resumen.recuperados;
+
+        if (resumen.inasistencias < 0) resumen.inasistencias = 0;
+      }
+ 
       // Contar ventas cerradas
       if (row["Venta Meg"] === 1) {
         resumenPorCloser[closer].cerradas++;
@@ -418,7 +427,7 @@ const DashboardTable = () => {
         "Recuperado": ((stats.agendas > 0 ? stats.recuperados / stats.agendas : 0) * 100).toFixed(2) + "%",
         "No Aplican": ((stats.agendas > 0 ? stats.descalificadas / stats.agendas : 0) * 100).toFixed(2) + "%",
         "Cerradas": ((stats.agendas > 0 ? stats.cerradas / stats.agendas : 0) * 100).toFixed(2) + "%",
-        "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%",
+       "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%"
       };
     });
 
@@ -473,7 +482,7 @@ const DashboardTable = () => {
       const response = await axios.get(`${API_URL}objetivos-closer`, {
         params: { closer, monthFilter },
       });
-  
+
       return response.data;
     } catch (error) {
       console.error("Error:", error);
