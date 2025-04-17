@@ -46,7 +46,7 @@ const DashboardTable = () => {
       try {
         const response = await axios.get(`${API_URL}dashboard`);
         setData(response.data);
-        const uniqueClosers = [...new Set(response.data.map(item => item["Closer Actual"]))];
+        const uniqueClosers = [...new Set(response.data.map(item => item["Closer Sub"]))];
         setClosers(uniqueClosers);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -54,19 +54,19 @@ const DashboardTable = () => {
     };
     fetchData();
   }, []);
-
+console.log('data', data)
   //useEffect para calcular los totales de ventas por closer
   useEffect(() => {
     const filtered = data.filter((row) =>
       row["Venta Club"] !== 1 &&
       new Date(row["Fecha correspondiente"]).toISOString().slice(0, 7) === monthFilter &&
-      (closerFilter ? row["Closer Actual"] === closerFilter : true)
+      (closerFilter ? row["Closer Sub"] === closerFilter : true)
     );
 
     const groupedByCloser = {};
 
     filtered.forEach((row) => {
-      const closer = row["Closer Actual"];
+      const closer = row["Closer Sub"];
       if (!groupedByCloser[closer]) {
         groupedByCloser[closer] = {
           "Total Sales": 0,
@@ -195,7 +195,7 @@ const DashboardTable = () => {
 
           if (row["Venta Meg"] === 1) {
             ventasPorFecha[fechaStr].equipo++;
-            if (closerFilter && row["Closer Actual"] === closerFilter) {
+            if (closerFilter && row["Closer Sub"] === closerFilter) {
               ventasPorFecha[fechaStr].vendedor++;
             }
           }
@@ -231,7 +231,7 @@ const DashboardTable = () => {
 
           if (row["Venta Meg"] === 1) {
             ventasPorFecha[fechaStr].equipo++;
-            if (closerFilter && row["Closer Actual"] === closerFilter) {
+            if (closerFilter && row["Closer Sub"] === closerFilter) {
               ventasPorFecha[fechaStr].vendedor++;
             }
           }
@@ -358,8 +358,8 @@ const DashboardTable = () => {
 
     // Primera pasada: procesar todas las filas para contabilizar métricas por closer
     filteredData.forEach((row) => {
-      // Usar "Closer Actual" si está disponible, de lo contrario usar "Responsable"
-      const closer = row["Closer Actual"] || row["Responsable"];
+      // Usar closer sub modificacion pactada con jota y marucho
+      const closer = row["Closer Sub"];
 
       // Ignorar registros sin closer o con "Sin Closer"
       if (!closer || closer === "Sin Closer") return;

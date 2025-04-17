@@ -818,3 +818,650 @@ export default function SalesMetricsTable() {
   )
 }
 
+
+
+CODIGO NUEVO FALTA MAQUETAR
+
+"use client"
+import React, { useEffect, useState } from "react"
+import {
+  parseISO,
+  format,
+  differenceInDays,
+  isAfter,
+  isBefore
+} from "date-fns"
+import "react-datepicker/dist/react-datepicker.css"
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
+
+export default function SalesMetricsTable() {
+
+  const API_BASE_URL = process.env.NODE_ENV === "production"
+    ? "https://metricas-back.onrender.com/metricas"
+    : "https://metricas-back.onrender.com/metricas"
+  const [startDate, setStartDate] = useState(null)
+  const [endDate, setEndDate] = useState(null)
+  const [data, setData] = useState([])
+  const [monthlyGoals, setMonthlyGoals] = useState({})
+  const [availableClosers, setAvailableClosers] = useState([])
+  const [availableOrigins, setAvailableOrigins] = useState([])
+  const [selectedCloser, setSelectedCloser] = useState("all");
+  const [selectedOrigin, setSelectedOrigin] = useState("all");
+
+
+  const [agrupadoPorMesAgendamiento, setAgrupadoPorMesAgendamiento] = useState({})
+  console.log(agrupadoPorMesAgendamiento)
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(API_BASE_URL)
+        const result = await response.json()
+        setData(result)
+        const closersWithSales = result
+          .filter((item) => item["Venta Meg"] > 0)
+          .map((item) => item.Responsable)
+        setAvailableClosers([...new Set(closersWithSales)])
+
+        const validOrigins = [...new Set(result.map((item) => item.Origen).filter(Boolean))]
+        setAvailableOrigins(validOrigins)
+      } catch (error) {
+        console.error("Error fetching data:", error)
+      }
+    }
+
+    fetchData()
+  }, [API_BASE_URL])
+
+  useEffect(() => {
+    if (data.length > 0) {
+      const datosFiltrados = data.filter((item) => {
+        const matchCloser = selectedCloser === "all" || item.Responsable === selectedCloser;
+        const matchOrigin = selectedOrigin === "all" || item.Origen === selectedOrigin;
+        return matchCloser && matchOrigin;
+      });
+
+      const resumenPorMes = agruparPorMesAgendamiento(datosFiltrados);
+      const ventasPorMesDeVenta = agruparVentasPorAgendamiento(datosFiltrados);
+
+      Object.keys(ventasPorMesDeVenta).forEach((mesVenta) => {
+        const datosVentaMes = ventasPorMesDeVenta[mesVenta];
+        if (!resumenPorMes[mesVenta]) {
+          resumenPorMes[mesVenta] = {
+            agendamientos: 0,
+            llamadasAplicables: 0,
+            llamadasEfectuadas: 0,
+            confirmaciones: 0,
+            ventasMeg: 0,
+            totalPrecio: 0,
+            totalCash: 0,
+            promedioDias: 0,
+          };
+        }
+        resumenPorMes[mesVenta].ventasPorAgendamiento = datosVentaMes;
+      });
+
+      setAgrupadoPorMesAgendamiento(resumenPorMes);
+      console.log("AGRUPADO FINAL:", resumenPorMes);
+    }
+  }, [data, selectedCloser, selectedOrigin]);
+
+
+  const agruparPorMesAgendamiento = (datos) => {
+    const agendamientos = datos.filter((item) => item.Agenda === 1)
+    const agrupado = {}
+
+    agendamientos.forEach((ag) => {
+      const clienteId = ag["Nombre cliente"]
+      const fechaAgendamiento = parseISO(ag["Fecha correspondiente"])
+      const mesClave = format(fechaAgendamiento, "yyyy-MM")
+
+      if (!agrupado[mesClave]) {
+        agrupado[mesClave] = {
+          agendamientos: 0,
+          llamadasAplicables: 0,
+          llamadasEfectuadas: 0,
+          confirmaciones: 0,
+          ventasMeg: 0,
+          totalPrecio: 0,
+          totalCash: 0,
+          sumaDias: 0,
+          totalVentas: 0,
+          ventasPorAgendamiento: [],
+        }
+      }
+
+      agrupado[mesClave].agendamientos += 1
+
+      // 🔍 Eventos posteriores del cliente (sin importar el mes)
+      const eventosPosteriores = datos.filter(
+        (item) =>
+          item["Nombre cliente"] === clienteId &&
+          isAfter(parseISO(item["Fecha correspondiente"]), fechaAgendamiento)
+      )
+
+      const llamadasAplicables = eventosPosteriores.filter(
+        (e) => e["Aplica?"]?.toLowerCase() === "aplica"
+      )
+      const llamadasEfectuadas = eventosPosteriores.filter(
+        (e) => e["Llamadas efectuadas"] > 0
+      )
+      const confirmaciones = llamadasAplicables // según lo definido
+
+      agrupado[mesClave].llamadasAplicables += llamadasAplicables.length
+      agrupado[mesClave].llamadasEfectuadas += llamadasEfectuadas.length
+      agrupado[mesClave].confirmaciones += confirmaciones.length
+
+      // 💰 Ventas MEG posteriores al agendamiento Y ocurridas en el mismo mes del agendamiento
+      const ventasMEG = datos.filter((item) =>
+        item["Nombre cliente"] === clienteId &&
+        item["Venta Meg"] > 0 &&
+        isAfter(parseISO(item["Fecha correspondiente"]), fechaAgendamiento) &&
+        format(parseISO(item["Fecha correspondiente"]), "yyyy-MM") === mesClave
+      )
+
+      agrupado[mesClave].ventasMeg += ventasMEG.length
+      agrupado[mesClave].totalPrecio += ventasMEG.reduce((acc, v) => acc + (v["Precio"] || 0), 0)
+      agrupado[mesClave].totalCash += ventasMEG.reduce((acc, v) => acc + (v["Cash collected total"] || 0), 0)
+
+      agrupado[mesClave].sumaDias += ventasMEG.reduce(
+        (acc, v) =>
+          acc +
+          differenceInDays(
+            parseISO(v["Fecha correspondiente"]),
+            fechaAgendamiento
+          ),
+        0
+      )
+      agrupado[mesClave].totalVentas += ventasMEG.length
+
+      agrupado[mesClave].ventasPorAgendamiento.push({
+        clienteId,
+        fechaAgendamiento,
+        cantidadVentas: ventasMEG.length,
+      })
+    })
+
+    // Calcular promedio final de días agendamiento → venta
+    Object.keys(agrupado).forEach((mes) => {
+      const grupo = agrupado[mes]
+      grupo.promedioDias = grupo.totalVentas > 0
+        ? parseFloat((grupo.sumaDias / grupo.totalVentas).toFixed(1))
+        : 0
+      delete grupo.sumaDias
+      delete grupo.totalVentas
+    })
+
+    return agrupado
+  }
+
+  const agruparVentasPorAgendamiento = (datos) => {
+    const ventas = datos.filter((item) => item["Venta Meg"] > 0)
+    const agrupado = {}
+
+    ventas.forEach((venta) => {
+      const fechaVenta = parseISO(venta["Fecha correspondiente"])
+      const ventaMesClave = format(fechaVenta, "yyyy-MM")
+      const clienteId = venta["Nombre cliente"]
+
+      const agenda = datos.find(
+        (item) =>
+          item["Nombre cliente"] === clienteId &&
+          item.Agenda === 1 &&
+          isBefore(parseISO(item["Fecha correspondiente"]), fechaVenta)
+      )
+
+      const agendamientoMesClave = agenda
+        ? format(parseISO(agenda["Fecha correspondiente"]), "yyyy-MM")
+        : null
+
+      if (!agrupado[ventaMesClave]) {
+        agrupado[ventaMesClave] = {
+          ventasSinAgendamiento: 0,
+          ventasPorMesAgendamiento: {} // agrupación normal
+        }
+      }
+
+      if (agendamientoMesClave) {
+        if (!agrupado[ventaMesClave].ventasPorMesAgendamiento[agendamientoMesClave]) {
+          agrupado[ventaMesClave].ventasPorMesAgendamiento[agendamientoMesClave] = 0
+        }
+        agrupado[ventaMesClave].ventasPorMesAgendamiento[agendamientoMesClave] += 1
+      } else {
+        agrupado[ventaMesClave].ventasSinAgendamiento += 1
+      }
+    })
+
+    return agrupado
+  }
+
+  useEffect(() => {
+    if (data.length > 0) {
+      //filtros cruzados
+      const datosFiltrados = data.filter((item) => {
+        const matchCloser = selectedCloser === "all" || item.Responsable === selectedCloser;
+        const matchOrigin = selectedOrigin === "all" || item.Origen === selectedOrigin;
+        return matchCloser && matchOrigin;
+      });
+
+      const resumenPorMes = agruparPorMesAgendamiento(datosFiltrados);
+      const ventasPorMesDeVenta = agruparVentasPorAgendamiento(datosFiltrados);
+
+
+      // Asignar ventas por agendamiento directamente al campo "ventasPorAgendamiento" de cada mes de venta
+      Object.keys(ventasPorMesDeVenta).forEach((mesVenta) => {
+        const datosVentaMes = ventasPorMesDeVenta[mesVenta]
+        // Si no existe ese mes en resumen, lo creamos (en caso de que haya ventas pero no agendas)
+        if (!resumenPorMes[mesVenta]) {
+          resumenPorMes[mesVenta] = {
+            agendamientos: 0,
+            llamadasAplicables: 0,
+            llamadasEfectuadas: 0,
+            confirmaciones: 0,
+            ventasMeg: 0,
+            totalPrecio: 0,
+            totalCash: 0,
+            promedioDias: 0,
+          }
+        }
+        // 🔁 Insertamos todo el resultado directamente como campo adicional
+        resumenPorMes[mesVenta].ventasPorAgendamiento = datosVentaMes
+      })
+
+      setAgrupadoPorMesAgendamiento(resumenPorMes)
+      console.log("AGRUPADO FINAL:", resumenPorMes)
+    }
+  }, [data])
+
+
+
+  const filtrarPorRango = (data) => {
+    if (!startDate || !endDate) return null
+
+    const resumen = {
+      agendamientos: 0,
+      llamadasAplicables: 0,
+      llamadasEfectuadas: 0,
+      confirmaciones: 0,
+      ventasMeg: 0,
+      totalPrecio: 0,
+      totalCash: 0,
+      promedioDias: 0,
+    }
+
+    let sumaDias = 0
+    let totalVentas = 0
+
+    data.forEach((item) => {
+      const fecha = parseISO(item["Fecha correspondiente"])
+      const clienteId = item["Nombre cliente"]
+
+      if (item.Agenda === 1 && fecha >= startDate && fecha <= endDate) {
+        resumen.agendamientos++
+        const eventosPosteriores = data.filter(
+          (e) =>
+            e["Nombre cliente"] === clienteId &&
+            isAfter(parseISO(e["Fecha correspondiente"]), fecha)
+        )
+
+        const llamadasAplicables = eventosPosteriores.filter(
+          (e) => e["Aplica?"]?.toLowerCase() === "aplica"
+        )
+        const llamadasEfectuadas = eventosPosteriores.filter(
+          (e) => e["Llamadas efectuadas"] > 0
+        )
+        const ventasMEG = data.filter(
+          (e) =>
+            e["Nombre cliente"] === clienteId &&
+            e["Venta Meg"] > 0 &&
+            isAfter(parseISO(e["Fecha correspondiente"]), fecha) &&
+            parseISO(e["Fecha correspondiente"]) >= startDate &&
+            parseISO(e["Fecha correspondiente"]) <= endDate
+        )
+
+        resumen.llamadasAplicables += llamadasAplicables.length
+        resumen.llamadasEfectuadas += llamadasEfectuadas.length
+        resumen.confirmaciones += llamadasAplicables.length
+        resumen.ventasMeg += ventasMEG.length
+        resumen.totalPrecio += ventasMEG.reduce((acc, v) => acc + (v["Precio"] || 0), 0)
+        resumen.totalCash += ventasMEG.reduce((acc, v) => acc + (v["Cash collected total"] || 0), 0)
+
+        sumaDias += ventasMEG.reduce(
+          (acc, v) =>
+            acc + differenceInDays(parseISO(v["Fecha correspondiente"]), fecha),
+          0
+        )
+        totalVentas += ventasMEG.length
+      }
+    })
+
+    resumen.promedioDias = totalVentas > 0 ? parseFloat((sumaDias / totalVentas).toFixed(1)) : 0
+    return resumen
+  }
+
+  useEffect(() => {
+    const fetchGoals = async () => {
+      try {
+        const response = await fetch("https://metricas-back.onrender.com/goals")
+        const result = await response.json()
+
+        const formattedGoals = result.reduce((acc, item) => {
+          if (item?.month) {
+            acc[item.month] = {
+              closer: item.closer || "all",
+              origin: item.origin || "all",
+              metrics: item.metrics || []
+            }
+          }
+          return acc
+        }, {})
+
+        setMonthlyGoals((prev) => ({ ...prev, ...formattedGoals }))
+      } catch (error) {
+        console.error("Error al obtener objetivos:", error)
+      }
+    }
+
+    fetchGoals()
+  }, [])
+
+  const getGoal = (month, metricName) => {
+    const goals = monthlyGoals[month]?.metrics || []
+    const found = goals.find((m) => m.name === metricName)
+    return found?.goal || 0
+  }
+
+  const perc = (parte, total) => total > 0 ? ((parte / total) * 100).toFixed(2) : "0";
+  const calc = (real, meta) => meta > 0 ? ((real / meta) * 100).toFixed(1) : "0";
+
+  const formatMes = (mesClave) => {
+    if (!mesClave || !mesClave.includes("-")) return mesClave;
+    const [anio, mes] = mesClave.split("-");
+    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    return `${meses[parseInt(mes, 10) - 1]} ${anio}`;
+  };
+
+  return (
+    <div className="p-4 space-y-8">
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-4 items-end">
+        <div>
+          <label className="text-sm text-gray-600 block mb-1">Desde</label>
+          <DatePicker
+            selected={startDate}
+            onChange={(date) => setStartDate(date)}
+            selectsStart
+            startDate={startDate}
+            endDate={endDate}
+            className="border border-gray-300 rounded-xl px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-400"
+            placeholderText="Inicio"
+          />
+        </div>
+        <div>
+          <label className="text-sm text-gray-600 block mb-1">Hasta</label>
+          <DatePicker
+            selected={endDate}
+            onChange={(date) => setEndDate(date)}
+            selectsEnd
+            startDate={startDate}
+            endDate={endDate}
+            minDate={startDate}
+            className="border border-gray-300 rounded-xl px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-400"
+            placeholderText="Fin"
+          />
+        </div>
+        <div>
+          <label className="text-sm text-gray-600 block mb-1">Closer</label>
+          <select
+            value={selectedCloser}
+            onChange={(e) => setSelectedCloser(e.target.value)}
+            className="border border-gray-300 rounded-xl px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-400"
+          >
+            <option value="all">Todos</option>
+            {availableClosers.map((closer) => (
+              <option key={closer} value={closer}>
+                {closer}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-sm text-gray-600 block mb-1">Origen</label>
+          <select
+            value={selectedOrigin}
+            onChange={(e) => setSelectedOrigin(e.target.value)}
+            className="border border-gray-300 rounded-xl px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-400"
+          >
+            <option value="all">Todos</option>
+            {availableOrigins.map((origin) => (
+              <option key={origin} value={origin}>
+                {origin}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+
+      {/* Carta personalizada por rango */}
+      {startDate && endDate && (() => {
+        const datosFiltradosRango = data.filter((item) => {
+          const matchCloser = selectedCloser === "all" || item.Responsable === selectedCloser;
+          const matchOrigin = selectedOrigin === "all" || item.Origen === selectedOrigin;
+          return matchCloser && matchOrigin;
+        });
+        const resumen = filtrarPorRango(datosFiltradosRango)
+
+
+        if (!resumen) {
+          return (
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+              <p className="text-sm text-gray-500">Sin datos para mostrar.</p>
+            </div>
+          )
+        }
+
+        const porcentajeAplicadas = resumen.agendamientos > 0
+          ? ((resumen.llamadasAplicables / resumen.agendamientos) * 100).toFixed(1) : 0
+        const porcentajeEfectuadas = resumen.llamadasAplicables > 0
+          ? ((resumen.llamadasEfectuadas / resumen.llamadasAplicables) * 100).toFixed(1) : 0
+        const porcentajeVendidas = resumen.llamadasEfectuadas > 0
+          ? ((resumen.ventasMeg / resumen.llamadasEfectuadas) * 100).toFixed(1) : 0
+        const cashReal = resumen.totalPrecio > 0
+          ? ((resumen.totalCash / resumen.totalPrecio) * 100).toFixed(1)
+          : 0
+
+        return (
+          <div className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6 transition hover:shadow-xl">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Resumen personalizado ({format(startDate, "dd/MM/yyyy")} - {format(endDate, "dd/MM/yyyy")})
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-800">
+              <div>
+                <p className="font-semibold">Agendamientos</p>
+                <p className="text-xl font-bold">{resumen.agendamientos}</p>
+              </div>
+              <div>
+                <p className="font-semibold">Aplicables</p>
+                <p className="text-xl font-bold">{resumen.llamadasAplicables}</p>
+                <p className="text-xs text-gray-500">{porcentajeAplicadas}% sobre agendados</p>
+              </div>
+              <div>
+                <p className="font-semibold">Efectuadas</p>
+                <p className="text-xl font-bold">{resumen.llamadasEfectuadas}</p>
+                <p className="text-xs text-gray-500">{porcentajeEfectuadas}% sobre aplicables</p>
+              </div>
+              <div>
+                <p className="font-semibold">Confirmaciones</p>
+                <p className="text-xl font-bold">{resumen.confirmaciones}</p>
+              </div>
+              <div>
+                <p className="font-semibold">Vendidas</p>
+                <p className="text-xl font-bold">{resumen.ventasMeg}</p>
+                <p className="text-xs text-gray-500">{porcentajeVendidas}% sobre efectuadas</p>
+              </div>
+              <div>
+                <p className="font-semibold">Total</p>
+                <p className="text-xl font-bold">$ {resumen.totalPrecio?.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="font-semibold">Cash</p>
+                <p className="text-xl font-bold">$ {resumen.totalCash?.toLocaleString()}</p>
+                <p className="text-xs text-gray-500">% Real: {cashReal}%</p>
+              </div>
+              <div>
+                <p className="font-semibold">Prom. días</p>
+                <p className="text-xl font-bold">{resumen.promedioDias}</p>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Cartas mensuales con objetivos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+        {Object.entries(agrupadoPorMesAgendamiento).map(([mes, resumen]) => {
+          const mesKey = mes;
+
+          const cumplimientoCash = getGoal(mesKey, "Cash %") > 0
+            ? calc((resumen.totalCash / resumen.totalPrecio) * 100, getGoal(mesKey, "Cash %"))
+            : "0";
+
+          const handleInputChange = (metricName, value) => {
+            setMonthlyGoals((prev) => {
+              const updated = { ...prev };
+              if (!updated[mesKey]) updated[mesKey] = { metrics: [] };
+              const index = updated[mesKey].metrics.findIndex((m) => m.name === metricName);
+              if (index !== -1) {
+                updated[mesKey].metrics[index].goal = Number(value);
+              } else {
+                updated[mesKey].metrics.push({ name: metricName, goal: Number(value) });
+              }
+              return updated;
+            });
+          };
+
+          const saveGoal = async (month) => {
+            const metrics = monthlyGoals[month]?.metrics || [];
+            const goalData = {
+              month,
+              closer: selectedCloser,
+              origin: selectedOrigin,
+              metrics: metrics,
+            };
+
+            try {
+              const response = await fetch(`https://metricas-back.onrender.com/update-goal`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(goalData),
+              });
+
+              if (!response.ok) {
+                throw new Error("Error al guardar los datos");
+              }
+
+              const data = await response.json();
+              toast.success("Objetivo actualizado correctamente!");
+            } catch (error) {
+              console.error("Error al actualizar objetivos:", error);
+              toast.error("Error al actualizar objetivos");
+            }
+          };
+
+          return (
+            <div key={mes} className="rounded-2xl border border-gray-200 bg-white shadow-md p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">{mes}</h2>
+              <div className="space-y-4 text-sm text-gray-800">
+                {["Llamadas Agendadas", "Aplicables", "Llamadas efectuadas", "Venta Meg", "Monto total", "Cash %"].map((goalKey) => {
+                  const labelMap = {
+                    "Llamadas Agendadas": "Llamadas Agendadas",
+                    "Aplicables": "Llamadas Aplicables",
+                    "Llamadas efectuadas": "Llamadas Efectuadas",
+                    "Venta Meg": "Llamadas Vendidas",
+                    "Monto total": "Monto Total",
+                    "Cash %": "Cash Collected"
+                  };
+                  const valueMap = {
+                    "Llamadas Agendadas": resumen.agendamientos,
+                    "Aplicables": resumen.llamadasAplicables,
+                    "Llamadas efectuadas": resumen.llamadasEfectuadas,
+                    "Venta Meg": resumen.ventasMeg,
+                    "Monto total": `$ ${resumen.totalPrecio?.toLocaleString()}`,
+                    "Cash %": `$ ${resumen.totalCash?.toLocaleString()}`
+                  };
+                  const baseValue = ["Monto total", "Cash %"].includes(goalKey) ? resumen.totalPrecio : resumen[goalKey.toLowerCase().replace(/ /g, "")];
+                  const percentage = goalKey === "Cash %" ? perc(resumen.totalCash, resumen.totalPrecio) : null;
+
+                  return (
+                    <div key={goalKey}>
+                      <p className="font-semibold">{labelMap[goalKey]}</p>
+                      <p className="text-2xl font-bold">{valueMap[goalKey]}</p>
+                      {percentage && <p className="text-gray-500 text-sm">{percentage}% sobre base</p>}
+                      <p>
+                        Objetivo:
+                        <input
+                          type="number"
+                          className="border border-gray-300 rounded-md px-2 py-1 text-sm ml-2 w-24"
+                          value={getGoal(mesKey, goalKey)}
+                          onChange={(e) => handleInputChange(goalKey, e.target.value)}
+                        />
+                      </p>
+                      <p>Cumplimiento: {calc(goalKey === "Cash %" ? percentage : baseValue, getGoal(mesKey, goalKey))}%</p>
+                    </div>
+                  );
+                })}
+
+                {/* Ventas por mes de agendamiento */}
+                <div className="pt-4 border-t border-gray-100">
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-sm font-semibold text-gray-800 select-none">
+                      Ventas por mes de agendamiento
+                    </summary>
+
+                    <div className="mt-2 pl-3 text-sm text-gray-700 space-y-1">
+                      {resumen.ventasPorAgendamiento?.ventasPorMesAgendamiento &&
+                        Object.entries(resumen.ventasPorAgendamiento.ventasPorMesAgendamiento).map(([mesOrigen, cantidad]) => (
+                          <div key={mesOrigen} className="flex justify-between pr-4">
+                            <span>{formatMes(mesOrigen)}</span>
+                            <span className="font-semibold">{cantidad}</span>
+                          </div>
+                        ))}
+
+                      {"ventasSinAgendamiento" in resumen.ventasPorAgendamiento && (
+                        <div className="flex justify-between pr-4 pt-2 border-t border-gray-100 text-gray-600">
+                          <span>Sin agendamiento</span>
+                          <span className="font-semibold">{resumen.ventasPorAgendamiento.ventasSinAgendamiento}</span>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                </div>
+
+                {/* Intervalo */}
+                <div>
+                  <p className="font-semibold">Intervalo de Ventas</p>
+                  <p className="text-lg font-bold">{resumen.promedioDias} días</p>
+                </div>
+
+                {/* Botón para guardar objetivos */}
+                <div className="pt-4">
+                  <button
+                    className="bg-gray-800 text-white text-sm px-4 py-2 rounded-xl shadow hover:bg-gray-700"
+                    onClick={() => saveGoal(mesKey)}
+                  >
+                    Establecer objetivos
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  )
+
+
+}
