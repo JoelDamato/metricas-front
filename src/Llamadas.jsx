@@ -661,10 +661,11 @@ export default function SalesMetricsTable() {
                   {/* 🧾 Ventas por Submes */}
 
                   <VentasPorFechaConAgendamiento
-  month={month}
-  closer={selectedCloser}
-  origin={selectedOrigin}
+month={month}
+closer={selectedCloser}
+origin={selectedOrigin}
 />
+
 
 
                   {/* 🟢 Intervalo de Ventas */}

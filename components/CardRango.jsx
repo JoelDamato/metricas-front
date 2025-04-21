@@ -1,22 +1,28 @@
 import { useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import VentasPorFechaConAgendamiento from "./VentasPorFechaConAgendamiento";
 
 export default function ResumenPorRango({ API_URL, formatCurrency }) {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [selectedCloser, setSelectedCloser] = useState("all");
+  const [selectedOrigin, setSelectedOrigin] = useState("all");
   const [availableClosers, setAvailableClosers] = useState([]);
+  const [availableOrigins, setAvailableOrigins] = useState([]);
   const [resumen, setResumen] = useState(null);
 
   useEffect(() => {
-    const fetchClosers = async () => {
+    const fetchClosersAndOrigins = async () => {
       const response = await fetch(API_URL);
       const data = await response.json();
       const closers = [...new Set(data.filter(item => item["Venta Meg"] > 0).map(item => item.Responsable))];
+      const origins = [...new Set(data.map(item => item.Origen).filter(Boolean))];
+
       setAvailableClosers(closers);
+      setAvailableOrigins(origins);
     };
-    fetchClosers();
+    fetchClosersAndOrigins();
   }, [API_URL]);
 
   useEffect(() => {
@@ -30,14 +36,16 @@ export default function ResumenPorRango({ API_URL, formatCurrency }) {
         const fecha = new Date(item["Fecha correspondiente"]);
         const matchFecha = fecha >= startDate && fecha <= endDate;
         const matchCloser = selectedCloser === "all" || item.Responsable === selectedCloser;
-        return item.Agenda === 1 && matchFecha && matchCloser;
+        const matchOrigin = selectedOrigin === "all" || item.Origen === selectedOrigin;
+        return item.Agenda === 1 && matchFecha && matchCloser && matchOrigin;
       });
 
       const clientesAgendados = new Set(agendamientos.map(i => i["Nombre cliente"]));
 
       const interaccionesClientes = data.filter(item =>
         clientesAgendados.has(item["Nombre cliente"]) &&
-        (selectedCloser === "all" || item.Responsable === selectedCloser)
+        (selectedCloser === "all" || item.Responsable === selectedCloser) &&
+        (selectedOrigin === "all" || item.Origen === selectedOrigin)
       );
 
       const resumenCalculado = interaccionesClientes.reduce(
@@ -58,7 +66,12 @@ export default function ResumenPorRango({ API_URL, formatCurrency }) {
     };
 
     fetchResumen();
-  }, [startDate, endDate, selectedCloser, API_URL]);
+  }, [startDate, endDate, selectedCloser, selectedOrigin, API_URL]);
+
+  const getMonthString = (date) => {
+    if (!date) return null;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  };
 
   return (
     <div className="w-full md:w-[32%] bg-white rounded-lg shadow-md overflow-visible min-h-[540px] pb-6">
@@ -100,10 +113,21 @@ export default function ResumenPorRango({ API_URL, formatCurrency }) {
           ))}
         </select>
 
+        <select
+          className="w-full border rounded p-1"
+          value={selectedOrigin}
+          onChange={(e) => setSelectedOrigin(e.target.value)}
+        >
+          <option value="all">Todos los orígenes</option>
+          {availableOrigins.map((origin, idx) => (
+            <option key={idx} value={origin}>{origin}</option>
+          ))}
+        </select>
+
         {/* Datos */}
         {resumen && (
           <div className="grid grid-cols-2 gap-3 mt-4">
-            {[
+            {[ 
               { label: "Llamadas Agendadas", value: resumen.Agenda },
               { label: "Llamadas Aplicables", value: resumen.Aplica },
               { label: "Call Confirm Exitoso", value: resumen.Confirm },
@@ -118,6 +142,17 @@ export default function ResumenPorRango({ API_URL, formatCurrency }) {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Ventas agrupadas por agendamiento */}
+        {startDate && (
+          <VentasPorFechaConAgendamiento
+  startDate={startDate}
+  endDate={endDate}
+  closer={selectedCloser}
+  origin={selectedOrigin}
+/>
+
         )}
       </div>
     </div>
