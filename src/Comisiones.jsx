@@ -18,78 +18,54 @@ export default function Comisiones() {
 
     const API_BASE_URL = process.env.NODE_ENV === "production"
         ? "https://metricas-back.onrender.com/"
-        : "https://metricas-back.onrender.com/"
+        : "http://localhost:30003/"
 
-    // Fetch de datos al montar el componente
-    useEffect(() => {
-        const fetchComisionesData = async () => {
-            try {
-                setLoading(true);
-                const response = await axios.get(`${API_BASE_URL}comisiones-meg`);
-
-                // Transformar transacciones agrupadas por mes
-                const transformedTransactions = Object.entries(response.data.transaccionesPorMes)
-                    .flatMap(([mes, transacciones]) =>
-                        transacciones.map(trans => ({
-                            id: trans.id,
-                            date: new Date(trans.fecha).toLocaleDateString(),
-                            month: mes,
-                            clientName: trans.cliente,
-                            responsible: trans.responsable || trans.closer || 'Sin asignar',
-                            cashCollected: trans.cashCollected,
-                            product: trans.producto
-                        }))
-                    );
-
-                // Transformar resumen por responsable y mes
-                const transformedEarnings = response.data.resumen.map(earn => {
-                    const [year, rawMonth] = earn.mes.split("-");
-                    const mesFormateado = `${year}-${rawMonth.padStart(2, "0")}`;
-
-                    const totalVentas = (earn.detalleComisiones?.MEG?.ventasNivel1 || 0)
-                        + (earn.detalleComisiones?.MEG?.ventasNivel2 || 0)
-                        + (earn.detalleComisiones?.MEG?.ventasNivel3 || 0)
-                        + (earn.detalleComisiones?.CLUB?.ventas || 0);
-
-                    const comisionTotal = (earn.comisionMEG || 0) + (earn.comisionClub || 0);
-
-                    return {
-                        responsable: earn.responsable,
-                        mes: mesFormateado,
-                        totalVentas,
-                        totalVentasMEG: (earn.detalleComisiones?.MEG?.ventasNivel1 || 0)
-                            + (earn.detalleComisiones?.MEG?.ventasNivel2 || 0)
-                            + (earn.detalleComisiones?.MEG?.ventasNivel3 || 0),
-                        totalVentasClub: earn.detalleComisiones?.CLUB?.ventas || 0,
-                        totalCashCollectedMEG: earn.totalCashCollectedOtros || 0,
-                        totalCashCollectedClub: earn.totalCashCollectedClub || 0,
-                        totalCashCollected: earn.totalCashCollected,
-                        comisionTotal,
-                        comisionMEG: earn.comisionMEG || 0,
-                        comisionClub: earn.comisionClub || 0,
-                        detalleComisiones: earn.detalleComisiones || {},
-                        productos: earn.productos,
-                        commissionToSubtract: 0,
-                        commissionToAdd: 0,
-                    };
-                });
-
-
-
-                setTransactions(transformedTransactions);
-                setEarnings(transformedEarnings);
-
-                setLoading(false);
-            } catch (err) {
-                console.error('Error al obtener datos de comisiones:', err);
-                setError('No se pudieron cargar los datos');
-                setLoading(false);
-            }
-        };
-
-        fetchComisionesData();
-    }, []);
-
+        useEffect(() => {
+            const fetchComisionesData = async () => {
+                try {
+                    setLoading(true);
+                    const response = await axios.get(`${API_BASE_URL}comisiones-meg`);
+                    
+                    console.log('Respuesta API:', response.data); // 👈 Debug útil
+                    
+                    const agrupado = response?.data?.agrupado || {};
+        
+                    // Transformar estructura agrupada a earnings por responsable y mes
+                    const transformedEarnings = Object.entries(agrupado).map(([key, earn]) => {
+                        const mes = earn.mes?.length === 7 ? earn.mes : key.split("-").slice(-2).join("-");
+                        return {
+                            responsable: earn.responsable || 'Sin asignar',
+                            mes,
+                            totalVentas: earn.totalVentas || 0,
+                            totalVentasMEG: earn.totalVentasMEG || 0,
+                            totalVentasClub: earn.totalVentasClub || 0,
+                            totalCashCollectedMEG: earn.totalCashCollectedMEG || 0,
+                            totalCashCollectedClub: earn.totalCashCollectedClub || 0,
+                            totalCashCollected: earn.totalCashCollected || 0,
+                            comisionTotal: earn.comisionTotal || 0,
+                            comisionMEG: earn.comisionMEG || 0,
+                            comisionClub: earn.comisionClub || 0,
+                            detalleComisiones: earn.detalleComisiones || {},
+                            productos: earn.productos || [],
+                            commissionToSubtract: 0,
+                            commissionToAdd: 0,
+                        };
+                    });
+        
+                    // No hay transacciones individuales en la respuesta, así que dejamos vacío o adaptás después
+                    setTransactions([]);
+                    setEarnings(transformedEarnings);
+                    setLoading(false);
+                } catch (err) {
+                    console.error('Error al obtener datos de comisiones:', err);
+                    setError('No se pudieron cargar los datos');
+                    setLoading(false);
+                }
+            };
+        
+            fetchComisionesData();
+        }, []);
+        
 
     // Obtener meses únicos para el filtro
     const uniqueMonths = useMemo(() => {

@@ -2,12 +2,15 @@
 import { ToastContainer, toast } from 'react-toastify';
 import React, { useEffect, useState } from "react"
 import "react-datepicker/dist/react-datepicker.css"
+import VentasPorFechaConAgendamiento from "../components/VentasPorFechaConAgendamiento"; // adaptá ruta
+
+import ResumenPorRango from "../components/CardRango"
 
 export default function SalesMetricsTable() {
 
   const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/metricas"
-    : "https://metricas-back.onrender.com/metricas"
+    : "http://localhost:30003/metricas"
 
 
   const [monthlyData, setMonthlyData] = useState([])
@@ -45,19 +48,30 @@ export default function SalesMetricsTable() {
           return matchesCloser && matchesOrigin;
         });
 
+        const clientesConAgendamiento = new Set(
+          filteredByCloserAndOrigin
+            .filter(item => item.Agenda === 1)
+            .map(item => item["Nombre cliente"])
+        );
+        
+        const datosSoloDeClientesConAgendamiento = filteredByCloserAndOrigin.filter(item =>
+          clientesConAgendamiento.has(item["Nombre cliente"])
+        );
+        
+
         // ✅ Lógica nueva que asigna todas las interacciones al mes del agendamiento del cliente
         const groupDataByMonth = (data) => {
           const acc = {};
           const indexByClient = {};
-
+        
           // Indexar interacciones por cliente
           data.forEach(item => {
             const clientId = item["Nombre cliente"];
             if (!indexByClient[clientId]) indexByClient[clientId] = [];
             indexByClient[clientId].push(item);
           });
-
-          // Indexar agendamientos por cliente
+        
+          // Indexar agendamientos por cliente (tomamos la más antigua)
           const agendamientos = data.filter(item => item.Agenda === 1);
           const fechaAgendamientoPorCliente = {};
           agendamientos.forEach(item => {
@@ -67,68 +81,59 @@ export default function SalesMetricsTable() {
               fechaAgendamientoPorCliente[id] = fecha;
             }
           });
-
-          // Procesar ventas
+        
+          // Agrupar todas las interacciones por mes de agendamiento
           data.forEach(item => {
+            const clienteId = item["Nombre cliente"];
+            const fechaAgenda = fechaAgendamientoPorCliente[clienteId];
+        
+            if (!fechaAgenda) return; // ignorar si no hay agendamiento
+        
+            const mesAgenda = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
+            if (!acc[mesAgenda]) acc[mesAgenda] = crearEstructuraMes();
+        
+            // Agregar métricas a ese mes
+            if (item["Aplica?"] === "Aplica") acc[mesAgenda]["Aplica?"] += 1;
+            acc[mesAgenda]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
+            acc[mesAgenda]["Venta Meg"] += item["Venta Meg"] || 0;
+            acc[mesAgenda]["Monto"] += item["Precio"] || 0;
+            acc[mesAgenda]["Cash collected"] += item["Cash collected total"] || 0;
+            acc[mesAgenda]["Call Confirm Exitoso"] += item["Call Confirm Exitoso"] || 0;
+
+            // Si es venta y hay intervalo, calcularlo
             if (item["Venta Meg"] > 0) {
-              const clienteId = item["Nombre cliente"];
               const fechaVenta = new Date(item["Fecha correspondiente"]);
-              const mesVenta = `${fechaVenta.getFullYear()}-${String(fechaVenta.getMonth() + 1).padStart(2, "0")}`;
-              const fechaAgenda = fechaAgendamientoPorCliente[clienteId];
-              const mesAgenda = fechaAgenda && fechaAgenda <= fechaVenta
-                ? `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`
-                : "Sin agendamiento";
-
-              if (!acc[mesVenta]) acc[mesVenta] = crearEstructuraMes();
-              acc[mesVenta]["Venta Meg"] += item["Venta Meg"] || 0;
-              acc[mesVenta]["Monto"] += item["Precio"] || 0;
-              acc[mesVenta]["Cash collected"] += item["Cash collected total"] || 0;
-
-              if (!acc[mesVenta].VentasPorAgendamientoDetalle[mesAgenda]) {
-                acc[mesVenta].VentasPorAgendamientoDetalle[mesAgenda] = 0;
-              }
-              acc[mesVenta].VentasPorAgendamientoDetalle[mesAgenda] += 1;
-
-              if (fechaAgenda && fechaVenta > fechaAgenda) {
+            
+              // Guardar detalle para el desplegable
+              acc[mesAgenda].ventasConDetalleDeAgendamiento.push({
+                clienteId: clienteId,
+                fechaVenta: item["Fecha correspondiente"],
+                mesAgendamiento: mesAgenda
+              });
+            
+              // Calcular intervalo de días si corresponde
+              if (fechaVenta > fechaAgenda) {
                 const dias = Math.floor((fechaVenta - fechaAgenda) / (1000 * 60 * 60 * 24));
-                acc[mesVenta].totalDiasEntreAgendaYVenta += dias;
-                acc[mesVenta].cantidadVentasConIntervalo += 1;
-                acc[mesVenta].intervaloPromedioDias = acc[mesVenta].totalDiasEntreAgendaYVenta / acc[mesVenta].cantidadVentasConIntervalo;
+                acc[mesAgenda].totalDiasEntreAgendaYVenta += dias;
+                acc[mesAgenda].cantidadVentasConIntervalo += 1;
+                acc[mesAgenda].intervaloPromedioDias = acc[mesAgenda].totalDiasEntreAgendaYVenta / acc[mesAgenda].cantidadVentasConIntervalo;
               }
             }
+            
           });
-
-          // Procesar agendamientos
+        
+          // Registrar cantidad de agendamientos por mes
           agendamientos.forEach(item => {
             const clienteId = item["Nombre cliente"];
             const fechaAgenda = new Date(item["Fecha correspondiente"]);
             const mesKey = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
             if (!acc[mesKey]) acc[mesKey] = crearEstructuraMes();
-
             acc[mesKey].Agenda += 1;
-
-            const interaccionesCliente = indexByClient[clienteId] || [];
-
-            const huboVentaEnEseMes = interaccionesCliente.some(inter => {
-              const fechaVenta = new Date(inter["Fecha correspondiente"]);
-              return (
-                inter["Venta Meg"] > 0 &&
-                fechaVenta.getFullYear() === fechaAgenda.getFullYear() &&
-                fechaVenta.getMonth() === fechaAgenda.getMonth()
-              );
-            });
-
-            if (huboVentaEnEseMes) {
-              interaccionesCliente.forEach(interaccion => {
-                if (interaccion["Aplica?"] === "Aplica") acc[mesKey]["Aplica?"] += 1;
-                acc[mesKey]["Llamadas efectuadas"] += interaccion["Llamadas efectuadas"] || 0;
-              });
-            }
           });
-
+        
           return acc;
         };
-
+        
         const crearEstructuraMes = () => ({
           Agenda: 0,
           "Aplica?": 0,
@@ -136,16 +141,19 @@ export default function SalesMetricsTable() {
           "Venta Meg": 0,
           Monto: 0,
           "Cash collected": 0,
+          "Call Confirm Exitoso": 0, 
           totalDiasEntreAgendaYVenta: 0,
           cantidadVentasConIntervalo: 0,
           intervaloPromedioDias: 0,
-          VentasPorAgendamientoDetalle: {}
+          VentasPorAgendamientoDetalle: {},
+          ventasConDetalleDeAgendamiento: []
         });
+        
 
 
 
-        // Obtener datos agrupados por mes
-        const groupedData = groupDataByMonth(filteredByCloserAndOrigin);
+        const groupedData = groupDataByMonth(datosSoloDeClientesConAgendamiento);
+
 
         // Esto genera el objeto ventasPorMes
         const ventasPorMes = {};
@@ -366,7 +374,7 @@ export default function SalesMetricsTable() {
   };
 
   const confirmPasswordAndSave = () => {
-    if (passwordInput === "hola1234") {
+    if (passwordInput === "randazzo12") {
       saveGoal(pendingMonthToSave);
       setShowPasswordModal(false);
       setPasswordInput("");
@@ -412,13 +420,13 @@ export default function SalesMetricsTable() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center items-center ">
-          <img
-            src="https://i.ibb.co/8XqZgCk/2-1.png"
-            alt="Cargando..."
-            className="w-1/4 h-1/4 sm:w-1/10 transition-transform transform hover:scale-110 animate-pulse"
-          />
-        </div>
+ <div className="flex justify-center items-center min-h-screen">
+ <img
+   src="https://i.ibb.co/8XqZgCk/2-1.png"
+   alt="Cargando..."
+   className="w-full sm:w-1/4 transition-transform transform hover:scale-110 animate-pulse"
+ />
+</div>
       ) : (
 
 
@@ -446,10 +454,14 @@ export default function SalesMetricsTable() {
                 <div className="p-1 space-y-1">
                   {/* 🟢 Llamadas Agendadas */}
                   <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+
+
                     <div className="flex justify-between items-center">
-                      <span className="text-md font-semibold text-gray-700 w-[40%]">Llamadas Agendadas</span>
-                      <span className="text-md font-bold text-gray-700">{totals.Agenda}</span>
-                    </div>
+  <span className="text-md font-semibold text-gray-700 w-[40%]">Llamadas Agendadas</span>
+  <span className="text-md font-bold text-gray-700 w-[20%] text-center">{totals.Agenda}</span>
+  <span className="w-[20%]"></span> {/* espacio para alinear con el % de la otra fila */}
+</div>
+
                     <div className="mt-1">
                       <div className="flex justify-between items-center">
                         <span className="text-md text-gray-600">Objetivo:</span>
@@ -535,6 +547,21 @@ export default function SalesMetricsTable() {
                       </div>
                     </div>
                   </div>
+
+                  {/* 🟢 Call Confirm Exitoso */}
+                <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
+           
+                  <div className="flex justify-between items-center">
+                    <span className="text-md font-semibold text-gray-700 w-[40%]">Call Confirm Exitoso</span>
+                    <span className="text-md font-bold text-gray-700 w-[20%] text-center">
+                      {totals["Call Confirm Exitoso"] || 0}</span>
+                      <span className="w-[20%]"></span> {/* espacio para alinear con el % de la otra fila */}
+                    
+                  </div>
+
+
+                </div>
+
 
                   {/* 🟢 Llamadas Efectuadas */}
                   <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
@@ -632,33 +659,12 @@ export default function SalesMetricsTable() {
                   </div>
 
                   {/* 🧾 Ventas por Submes */}
-                  <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
-                    <details className="group">
-                      <summary className="cursor-pointer text-[#4c4c4c] hover:underline flex justify-between items-center">
-                        <span className="text-md font-semibold">Ventas por mes de agendamiento:</span>
-                        <span className="transition-transform group-open:rotate-90">▶</span>
-                      </summary>
 
-                      <ul className="mt-2 pl-4 text-gray-700 text-sm list-disc">
-                        {Object.entries(totals.VentasPorAgendamientoDetalle || {})
-                          .sort(([a], [b]) => {
-                            if (a === "Sin agendamiento") return 1;
-                            if (b === "Sin agendamiento") return -1;
-                            return new Date(b) - new Date(a); // 👈 ahora es descendente
-                          })
-                          .map(([mesAgenda, cantidad], idx) => (
-                            <li key={idx}>
-                              {mesAgenda === "Sin agendamiento"
-                                ? "Sin fecha de agendamiento"
-                                : formatMonthYear(mesAgenda)}: <strong>{cantidad}</strong>
-                            </li>
-                          ))}
-                      </ul>
-
-
-
-                    </details>
-                  </div>
+                  <VentasPorFechaConAgendamiento
+  month={month}
+  closer={selectedCloser}
+  origin={selectedOrigin}
+/>
 
 
                   {/* 🟢 Intervalo de Ventas */}
@@ -814,6 +820,9 @@ export default function SalesMetricsTable() {
             )}
 
           </div>)}
+
+          <ResumenPorRango API_URL={API_BASE_URL} formatCurrency={formatCurrency} />
+
     </div>
   )
 }

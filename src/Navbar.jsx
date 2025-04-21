@@ -22,7 +22,7 @@ const Navbar = () => {
     <nav className="bg-black text-white h-[14vh] shadow-md">
       <div className="container mx-auto flex justify-between items-center h-full px-6">
         {/* 🔹 Logo */}
-        <a href="/dashboard" className="text-xl font-bold hover:text-[#00a79d] transition">
+        <a href="/" className="text-xl font-bold hover:text-[#E0C040] transition">
           Matias Randazzo
         </a>
 

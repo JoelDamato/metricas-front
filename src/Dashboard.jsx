@@ -63,6 +63,65 @@ console.log('data', data)
       (closerFilter ? row["Closer Sub"] === closerFilter : true)
     );
 
+
+    const abrilData = data.filter((row) => {
+      const esClaudio = row["Closer Sub"]?.trim() === "Claudio Nicolini";
+      const isoDate = new Date(row["Fecha correspondiente"]).toISOString().slice(0, 7);
+      const esAbril = isoDate === "2025-03";
+      // Normaliza la comparación para que sea consistente
+      const agendaOk = String(row["Agenda"]).trim() === "1" || row["Agenda"] === 1;
+      const aplicaOk = String(row["Aplica?"]).trim().toLowerCase() === "aplica";
+    
+      return esClaudio && esAbril && agendaOk && aplicaOk;
+    });
+
+    // Añade este código después de tu función existente para encontrar la diferencia
+const registrosEnConsola = data.filter(row => {
+  const esClaudio = row["Closer Sub"]?.trim() === "Claudio Nicolini";
+  const esMarzo = new Date(row["Fecha correspondiente"]).toISOString().slice(0, 7) === "2025-03";
+  const agendaOk = String(row["Agenda"]).trim() === "1" || row["Agenda"] === 1;
+  const aplicaOk = String(row["Aplica?"]).trim().toLowerCase() === "aplica";
+  return esClaudio && esMarzo && agendaOk && aplicaOk;
+});
+
+const registrosEnTabla = data.filter(row => {
+  const esClaudio = row["Closer Sub"]?.trim() === "Claudio Nicolini";
+  const esMarzo = new Date(row["Fecha correspondiente"]).toISOString().slice(0, 7) === "2025-03";
+  // Usar exactamente la misma lógica que se usa en el cálculo de la tabla
+  const agendaOk = (String(row["Agenda"]).trim() == "1" || row["Agenda"] == 1);
+  const aplicaOk = String(row["Aplica?"]).trim().toLowerCase() === "aplica";
+  return esClaudio && esMarzo && agendaOk && aplicaOk;
+});
+
+console.log("Registros encontrados en consola:", registrosEnConsola.length);
+console.log("Registros encontrados en tabla:", registrosEnTabla.length);
+
+// Encuentra el registro específico que está causando la diferencia
+const idsConsola = new Set(registrosEnConsola.map(row => row.id || row._id));
+const idsTabla = new Set(registrosEnTabla.map(row => row.id || row._id));
+
+const soloEnConsola = [...idsConsola].filter(id => !idsTabla.has(id));
+const soloEnTabla = [...idsTabla].filter(id => !idsConsola.has(id));
+
+if (soloEnConsola.length > 0) {
+  console.log("Registros que sólo están en la consola:", 
+    registrosEnConsola.filter(row => soloEnConsola.includes(row.id || row._id))
+  );
+  
+  // Mostrar los valores exactos de los campos problemáticos
+  registrosEnConsola.filter(row => soloEnConsola.includes(row.id || row._id))
+    .forEach(row => {
+      console.log(`Registro ID: ${row.id || row._id}`);
+      console.log(`Valor de Agenda: '${row["Agenda"]}' (${typeof row["Agenda"]})`);
+      console.log(`Valor de Aplica?: '${row["Aplica?"]}' (${typeof row["Aplica?"]})`);
+    });
+}
+
+if (soloEnTabla.length > 0) {
+  console.log("Registros que sólo están en la tabla:", 
+    registrosEnTabla.filter(row => soloEnTabla.includes(row.id || row._id))
+  );
+}
     const groupedByCloser = {};
 
     filtered.forEach((row) => {
@@ -120,14 +179,14 @@ console.log('data', data)
       const stats = groupedByCloser[closer];
 
       stats.percentages = {
-        "Cash collected": ((stats["Total Sales"] > 0 ? stats["Cash collected"] / stats["Total Sales"] : 0) * 100).toFixed(2) + "%",
-        "Cerradas": ((stats["Agendas totales"] > 0 ? stats["Cerradas"] / stats["Agendas totales"] : 0) * 100).toFixed(2) + "%",
-        "Cierre/Asistencias": ((stats["Asistencia"] + stats["Recuperado"] > 0 ? stats["Cierre/Asistencias"] / (stats["Asistencia"] + stats["Recuperado"]) : 0) * 100).toFixed(2) + "%",
-        "Asistencia": ((stats["Agendas totales"] > 0 ? (stats["Asistencia"] + stats["Recuperado"]) / stats["Agendas totales"] : 0) * 100).toFixed(2) + "%",
-        "No asiste": ((stats["Agendas totales"] > 0 ? stats["No asiste"] / stats["Agendas totales"] : 0) * 100).toFixed(2) + "%",
-        "No aplican": ((stats["Aplican"] + stats["No aplican"] > 0 ? stats["No aplican"] / (stats["Aplican"] + stats["No aplican"]) : 0) * 100).toFixed(2) + "%",
-        "Aplican": ((stats["Aplican"] + stats["No aplican"] > 0 ? stats["Aplican"] / (stats["Aplican"] + stats["No aplican"]) : 0) * 100).toFixed(2) + "%",
+        "Asistencia": ((stats.agendas > 0 ? stats.asistencias / stats.agendas : 0) * 100).toFixed(2) + "%",
+        "No Asiste": ((stats.agendas > 0 ? stats.inasistencias / stats.agendas : 0) * 100).toFixed(2) + "%",
+        "Recuperado": ((stats.agendas > 0 ? stats.recuperados / stats.agendas : 0) * 100).toFixed(2) + "%",
+        "Descalificados": ((stats.agendas > 0 ? stats.descalificados / stats.agendas : 0) * 100).toFixed(2) + "%",
+        "Cerradas": ((stats.agendas > 0 ? stats.cerradas / stats.agendas : 0) * 100).toFixed(2) + "%",
+        "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%"
       };
+      
     });
 
 
@@ -354,6 +413,35 @@ console.log('data', data)
       return monthYear === monthFilter;
     });
 
+    const clientesAgendadosEnElMes = new Set(
+      filteredData
+        .filter(item => String(item["Agenda"]).trim() === "1" || item["Agenda"] === 1)
+        .map(item => item["Nombre cliente"])
+    );
+    
+    const descalificadosPorCloser = {};
+    
+    clientesAgendadosEnElMes.forEach(cliente => {
+      const interacciones = filteredData
+        .filter(row => row["Nombre cliente"] === cliente)
+        .sort((a, b) => new Date(a["Fecha correspondiente"]) - new Date(b["Fecha correspondiente"]));
+    
+      let aplico = false;
+    
+      for (let interaccion of interacciones) {
+        if (String(interaccion["Aplica?"]).toLowerCase() === "aplica") {
+          aplico = true;
+        }
+        if (aplico && String(interaccion["Aplica?"]).toLowerCase() === "no aplica") {
+          const closer = interaccion["Closer Sub"];
+          if (!descalificadosPorCloser[closer]) descalificadosPorCloser[closer] = 0;
+          descalificadosPorCloser[closer]++;
+          break; // solo una vez por cliente
+        }
+      }
+    });
+    
+
     const resumenPorCloser = {};
 
     // Primera pasada: procesar todas las filas para contabilizar métricas por closer
@@ -375,11 +463,16 @@ console.log('data', data)
           cerradas: 0,
           sinAsistencia: 0,
           asistenciasConVenta: 0,
+          descalificados: descalificadosPorCloser[closer] || 0,
+
         };
       }
 
       // Contar agendas
-      if (row["Agenda"] === 1) {
+      if (
+        (String(row["Agenda"]).trim() == "1" || row["Agenda"] == 1) &&
+        String(row["Aplica?"]).trim().toLowerCase() === "aplica"
+      ) {
         resumenPorCloser[closer].agendas++;
       }
 
@@ -425,7 +518,7 @@ console.log('data', data)
         "Asistencia": ((stats.agendas > 0 ? stats.asistencias / stats.agendas : 0) * 100).toFixed(2) + "%",
         "No Asiste": ((stats.agendas > 0 ? stats.inasistencias / stats.agendas : 0) * 100).toFixed(2) + "%",
         "Recuperado": ((stats.agendas > 0 ? stats.recuperados / stats.agendas : 0) * 100).toFixed(2) + "%",
-        "No Aplican": ((stats.agendas > 0 ? stats.descalificadas / stats.agendas : 0) * 100).toFixed(2) + "%",
+        "Descalificados": (stats.agendas > 0 ? (stats.descalificados / stats.agendas) * 100 : 0).toFixed(2) + "%",
         "Cerradas": ((stats.agendas > 0 ? stats.cerradas / stats.agendas : 0) * 100).toFixed(2) + "%",
        "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%"
       };
@@ -674,10 +767,11 @@ console.log('data', data)
                             <td className="p-2 text-red-600 font-semibold">
                               {percentages["No Asiste"] || "0%"}
                             </td>
-                            <td className="p-2 text-gray-700">{datos.descalificadas || 0}</td>
+                            <td className="p-2 text-gray-700">{datos.descalificados || 0}</td>
                             <td className="p-2 text-gray-500 font-semibold">
-                              {percentages["No Aplican"] || "0%"}
+                              {percentages["Descalificados"] || "0%"}
                             </td>
+
                             <td className="p-2 text-gray-700">{datos.cerradas || 0}</td>
                             <td className="p-2 text-purple-600 font-semibold">
                               {percentages["Cerradas"] || "0%"}
@@ -693,50 +787,51 @@ console.log('data', data)
                     {(() => {
                       // Calcular totales
                       const totales = Object.entries(resumen)
-                        .filter(([closer]) => closer !== "Sin Closer")
-                        .reduce((acc, [_, datos]) => {
-                          acc.agendas += (datos.agendas || 0);
-                          acc.recuperados += (datos.recuperados || 0);
-                          acc.asistencias += (datos.asistencias || 0);
-                          acc.inasistencias += (datos.inasistencias || 0);
-                          acc.descalificadas += (datos.descalificadas || 0);
-                          acc.cerradas += (datos.cerradas || 0);
-                          return acc;
-                        }, {
-                          agendas: 0,
-                          recuperados: 0,
-                          asistencias: 0,
-                          inasistencias: 0,
-                          descalificadas: 0,
-                          cerradas: 0
-                        });
+                      .filter(([closer]) => closer !== "Sin Closer")
+                      .reduce((acc, [_, datos]) => {
+                        acc.agendas += (datos.agendas || 0);
+                        acc.recuperados += (datos.recuperados || 0);
+                        acc.asistencias += (datos.asistencias || 0);
+                        acc.inasistencias += (datos.inasistencias || 0);
+                        acc.descalificados += (datos.descalificados || 0);
+                        acc.cerradas += (datos.cerradas || 0);
+                        return acc;
+                      }, {
+                        agendas: 0,
+                        recuperados: 0,
+                        asistencias: 0,
+                        inasistencias: 0,
+                        descalificados: 0,
+                        cerradas: 0
+                      });
 
                       // Calcular porcentajes
                       const totalPercentages = {
                         "Recuperado": totales.agendas ? `${((totales.recuperados / totales.agendas) * 100).toFixed(1)}%` : "0%",
                         "Asistencia": totales.agendas ? `${((totales.asistencias / totales.agendas) * 100).toFixed(1)}%` : "0%",
                         "No Asiste": totales.agendas ? `${((totales.inasistencias / totales.agendas) * 100).toFixed(1)}%` : "0%",
-                        "No Aplican": totales.agendas ? `${((totales.descalificadas / totales.agendas) * 100).toFixed(1)}%` : "0%",
                         "Cerradas": totales.agendas ? `${((totales.cerradas / totales.agendas) * 100).toFixed(1)}%` : "0%",
-                        "S/Asistencia": totales.asistencias ? `${((totales.cerradas / totales.asistencias) * 100).toFixed(1)}%` : "0%"
+                        "S/Asistencia": totales.asistencias ? `${((totales.cerradas / totales.asistencias) * 100).toFixed(1)}%` : "0%",
+                        "Descalificados": totales.agendas ? `${((totales.descalificados / totales.agendas) * 100).toFixed(1)}%` : "0%"
                       };
 
-                      return (
-                        <tr className="bg-gray-200 font-bold text-center border-t-2 border-gray-400">
-                          <td className="p-2 text-gray-800 text-left">TOTAL</td>
-                          <td className="p-2 text-gray-700">{totales.agendas}</td>
-                          <td className="p-2 text-gray-700">{totales.recuperados}</td>
-                          <td className="p-2 text-green-600">{totalPercentages["Recuperado"]}</td>
-                          <td className="p-2 text-gray-700">{totales.asistencias}</td>
-                          <td className="p-2 text-blue-600">{totalPercentages["Asistencia"]}</td>
-                          <td className="p-2 text-gray-700">{totales.inasistencias}</td>
-                          <td className="p-2 text-red-600">{totalPercentages["No Asiste"]}</td>
-                          <td className="p-2 text-gray-700">{totales.descalificadas}</td>
-                          <td className="p-2 text-gray-500">{totalPercentages["No Aplican"]}</td>
-                          <td className="p-2 text-gray-700">{totales.cerradas}</td>
-                          <td className="p-2 text-purple-600">{totalPercentages["Cerradas"]}</td>
-                          <td className="p-2 text-orange-600">{totalPercentages["S/Asistencia"]}</td>
-                        </tr>
+                    
+  return (
+    <tr className="bg-gray-200 font-bold text-center border-t-2 border-gray-400">
+      <td className="p-2 text-gray-800 text-left">TOTAL</td>
+      <td className="p-2 text-gray-700">{totales.agendas}</td>
+      <td className="p-2 text-gray-700">{totales.recuperados}</td>
+      <td className="p-2 text-green-600">{totalPercentages["Recuperado"]}</td>
+      <td className="p-2 text-gray-700">{totales.asistencias}</td>
+      <td className="p-2 text-blue-600">{totalPercentages["Asistencia"]}</td>
+      <td className="p-2 text-gray-700">{totales.inasistencias}</td>
+      <td className="p-2 text-red-600">{totalPercentages["No Asiste"]}</td>
+      <td className="p-2 text-gray-700">{totales.descalificados}</td>
+<td className="p-2 text-gray-500">{totalPercentages["Descalificados"]}</td>
+      <td className="p-2 text-gray-700">{totales.cerradas}</td>
+      <td className="p-2 text-purple-600">{totalPercentages["Cerradas"]}</td>
+      <td className="p-2 text-orange-600">{totalPercentages["S/Asistencia"]}</td>
+    </tr>
                       );
                     })()}
                   </>
