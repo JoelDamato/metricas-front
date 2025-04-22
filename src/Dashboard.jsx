@@ -133,7 +133,6 @@ if (soloEnTabla.length > 0) {
           "Cash collected": 0,
           "Agendas totales": 0,
           "Cerradas": 0,
-          "Cierre/Asistencias": 0,
           "Asistencia": 0,
           "Recuperado": 0,
           "No asiste": 0,
@@ -168,9 +167,7 @@ if (soloEnTabla.length > 0) {
       }
 
 
-      if (row["Venta Meg"] > 0 && (row["Asistio?"] === "Asistió" || row["Asistio?"] === "Recuperado")) {
-        groupedByCloser[closer]["Cierre/Asistencias"] += 1;
-      }
+     
     });
 
 
@@ -494,16 +491,13 @@ if (soloEnTabla.length > 0) {
       }
 
       // Calcular inasistencias después de contar todo lo demás
-      for (const closer in resumenPorCloser) {
-        const resumen = resumenPorCloser[closer];
-        resumen.inasistencias =
-          resumen.agendas -
-          resumen.descalificadas -
-          resumen.asistencias -
-          resumen.recuperados;
+  // Calcular inasistencias una vez por closer
+Object.values(resumenPorCloser).forEach((resumen) => {
+  resumen.inasistencias = resumen.agendas - resumen.asistencias;
+  if (resumen.inasistencias < 0) resumen.inasistencias = 0;
+});
 
-        if (resumen.inasistencias < 0) resumen.inasistencias = 0;
-      }
+      
  
       // Contar ventas cerradas
       if (row["Venta Meg"] === 1) {
@@ -880,7 +874,6 @@ if (soloEnTabla.length > 0) {
                     "No asiste",
                     "No aplican",
                     "Aplican",
-                    "Cierre/Asistencias",
 
                   ].includes(key);
 
