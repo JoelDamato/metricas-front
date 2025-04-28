@@ -10,7 +10,7 @@ export default function SalesMetricsTable() {
 
   const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/metricas"
-    : "http://localhost:30003/metricas"
+    : "https://metricas-back.onrender.com/metricas"
 
 
   const [monthlyData, setMonthlyData] = useState([])
@@ -61,6 +61,18 @@ export default function SalesMetricsTable() {
 
         // ✅ Lógica nueva que asigna todas las interacciones al mes del agendamiento del cliente
         const groupDataByMonth = (data) => {
+          const ultimaInteraccionAplicaPorCliente = {};
+data.forEach(item => {
+  const clienteId = item["Nombre cliente"];
+  const fechaItem = new Date(item["Fecha correspondiente"]);
+  
+  if (!ultimaInteraccionAplicaPorCliente[clienteId] || fechaItem > ultimaInteraccionAplicaPorCliente[clienteId].fecha) {
+    ultimaInteraccionAplicaPorCliente[clienteId] = {
+      aplica: item["Aplica?"],
+      fecha: fechaItem
+    };
+  }
+});
           const acc = {};
           const indexByClient = {};
         
@@ -82,25 +94,40 @@ export default function SalesMetricsTable() {
             }
           });
         
-          // Agrupar todas las interacciones por mes de agendamiento
-          data.forEach(item => {
-            const clienteId = item["Nombre cliente"];
-            const fechaAgenda = fechaAgendamientoPorCliente[clienteId];
-        
-            if (!fechaAgenda) return; // ignorar si no hay agendamiento
-        
-            const mesAgenda = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
-            if (!acc[mesAgenda]) acc[mesAgenda] = crearEstructuraMes();
-        
-            // Agregar métricas a ese mes
-            if (item["Aplica?"] === "Aplica") acc[mesAgenda]["Aplica?"] += 1;
-            acc[mesAgenda]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
-            acc[mesAgenda]["Venta Meg"] += item["Venta Meg"] || 0;
-            acc[mesAgenda]["Monto"] += item["Precio"] || 0;
-            acc[mesAgenda]["Cash collected"] += item["Cash collected total"] || 0;
-            acc[mesAgenda]["Call Confirm Exitoso"] += item["Call Confirm Exitoso"] || 0;
+  // Agrupar todas las interacciones por mes de agendamiento
+data.forEach(item => {
+  const clienteId = item["Nombre cliente"];
+  const fechaAgenda = fechaAgendamientoPorCliente[clienteId];
 
-            // Si es venta y hay intervalo, calcularlo
+  if (!fechaAgenda) return; // ignorar si no hay agendamiento
+
+  const mesAgenda = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
+  if (!acc[mesAgenda]) acc[mesAgenda] = crearEstructuraMes();
+
+  // 🔥 Siempre guardar la última interacción (Aplica o No aplica)
+  const fechaItem = new Date(item["Fecha correspondiente"]);
+  if (!acc[mesAgenda].ultimasAplicablesPorCliente) {
+    acc[mesAgenda].ultimasAplicablesPorCliente = {};
+  }
+  if (
+    !acc[mesAgenda].ultimasAplicablesPorCliente[clienteId] ||
+    fechaItem > acc[mesAgenda].ultimasAplicablesPorCliente[clienteId].fecha
+  ) {
+    acc[mesAgenda].ultimasAplicablesPorCliente[clienteId] = {
+      fecha: fechaItem,
+      aplica: item["Aplica?"] // Guarda el estado (Aplica o No aplica)
+    };
+  }
+
+  // 📊 Resto de las métricas
+  acc[mesAgenda]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
+  acc[mesAgenda]["Venta Meg"] += item["Venta Meg"] || 0;
+  acc[mesAgenda]["Monto"] += item["Precio"] || 0;
+  acc[mesAgenda]["Cash collected"] += item["Cash collected total"] || 0;
+  acc[mesAgenda]["Call Confirm Exitoso"] += item["Call Confirm Exitoso"] || 0;
+
+  // Si es venta y hay intervalo, calcularlo...
+
             if (item["Venta Meg"] > 0) {
               const fechaVenta = new Date(item["Fecha correspondiente"]);
             
@@ -122,16 +149,41 @@ export default function SalesMetricsTable() {
             
           });
         
-          // Registrar cantidad de agendamientos por mes
-          agendamientos.forEach(item => {
-            const clienteId = item["Nombre cliente"];
-            const fechaAgenda = new Date(item["Fecha correspondiente"]);
-            const mesKey = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
-            if (!acc[mesKey]) acc[mesKey] = crearEstructuraMes();
-            acc[mesKey].Agenda += 1;
-          });
-        
-          return acc;
+   // Registrar cantidad de agendamientos por mes
+agendamientos.forEach(item => {
+  const clienteId = item["Nombre cliente"];
+  const fechaAgenda = new Date(item["Fecha correspondiente"]);
+  const mesKey = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
+  if (!acc[mesKey]) acc[mesKey] = crearEstructuraMes();
+  acc[mesKey].Agenda += 1;
+});
+
+// ✅ Contar las últimas interacciones aplicables por cliente en cada mes
+// 🟢 Contar las últimas interacciones "Aplica?" pero sumarlas al mes de agendamiento
+Object.entries(fechaAgendamientoPorCliente).forEach(([clienteId, fechaAgenda]) => {
+  const mesKey = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
+  const ultimaInteraccion = ultimaInteraccionAplicaPorCliente[clienteId];
+
+  if (ultimaInteraccion && ultimaInteraccion.aplica === "Aplica") {
+    acc[mesKey]["Aplica?"] += 1;
+
+    // 🐞 DEBUG CLIENTES APLICANDO
+    console.log({
+      clienteId,
+      mesAgendamiento: mesKey,
+      fechaAgendamiento: fechaAgenda.toISOString().split("T")[0],
+      ultimaInteraccion: ultimaInteraccion.aplica,
+      fechaUltimaInteraccion: ultimaInteraccion.fecha.toISOString().split("T")[0],
+    });
+  }
+});
+
+
+
+
+
+return acc;
+
         };
         
         const crearEstructuraMes = () => ({
