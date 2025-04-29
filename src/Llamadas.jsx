@@ -86,7 +86,7 @@ export default function SalesMetricsTable() {
           const fechaAgendamiento = new Date(item["Fecha de agendamiento"]);
   
           if (!isNaN(fechaAgendamiento)) {
-            const mesAgendamiento = `${fechaAgendamiento.getFullYear()}-${String(fechaAgendamiento.getMonth() + 1).padStart(2, "0")}`;
+            const mesAgendamiento = `${fechaAgendamiento.getUTCFullYear()}-${String(fechaAgendamiento.getUTCMonth() + 1).padStart(2, "0")}`;
   
             if (!acc[mesAgendamiento]) acc[mesAgendamiento] = crearEstructuraMes();
   
