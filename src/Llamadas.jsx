@@ -3,7 +3,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import React, { useEffect, useState } from "react"
 import "react-datepicker/dist/react-datepicker.css"
 import VentasPorFechaConAgendamiento from "../components/VentasPorFechaConAgendamiento"; // adaptá ruta
-
+import VentasVendidasPorAgendamiento from "../components/VentasVendidasPorAgendamiento";
 import ResumenPorRango from "../components/CardRango"
 
 export default function SalesMetricsTable() {
@@ -25,216 +25,42 @@ export default function SalesMetricsTable() {
   const [passwordInput, setPasswordInput] = useState("");
   const [pendingMonthToSave, setPendingMonthToSave] = useState(null);
 
-
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-
-        const response = await fetch(API_BASE_URL);
-        const result = await response.json();
-
-        const currentYear = new Date().getFullYear();
-
-        const filteredData = result.filter((item) => {
-          const dateString = item["Fecha correspondiente"];
-          const date = new Date(dateString);
-          return !isNaN(date) && date.getFullYear() === currentYear;
+    
+        const [metricasResponse, metricasClienteResponse] = await Promise.all([
+          fetch("https://metricas-back.onrender.com/metricas"),
+          fetch("https://metricas-back.onrender.com/metricascliente")
+        ]);
+    
+        const metricasData = await metricasResponse.json();
+        const metricasClienteData = await metricasClienteResponse.json();
+    
+        const ventasFiltradas = metricasData.filter(item => {
+          return !isNaN(new Date(item["Fecha correspondiente"]));
         });
-
-        const filteredByCloserAndOrigin = filteredData.filter((item) => {
-          const matchesCloser = selectedCloser === "all" || item.Responsable === selectedCloser;
-          const matchesOrigin = selectedOrigin === "all" || item.Origen === selectedOrigin;
-          return matchesCloser && matchesOrigin;
+    
+        const llamadasFiltradas = metricasClienteData.filter(item => item.Agendo === 1);
+    
+        const groupedData = groupDataByMonth(ventasFiltradas, llamadasFiltradas);
+    
+        const sortedMonthlyEntries = Object.entries(groupedData).sort(([a], [b]) => new Date(b) - new Date(a));
+    
+        const filteredSortedMonthlyEntries = sortedMonthlyEntries.filter(([month]) => {
+          const [year] = month.split("-").map(Number);
+          return year > 2024; // solo 2025 en adelante
         });
-
-        const clientesConAgendamiento = new Set(
-          filteredByCloserAndOrigin
-            .filter(item => item.Agenda === 1)
-            .map(item => item["Nombre cliente"])
-        );
-        
-        const datosSoloDeClientesConAgendamiento = filteredByCloserAndOrigin.filter(item =>
-          clientesConAgendamiento.has(item["Nombre cliente"])
-        );
-        
-
-        // ✅ Lógica nueva que asigna todas las interacciones al mes del agendamiento del cliente
-        const groupDataByMonth = (data) => {
-          const ultimaInteraccionAplicaPorCliente = {};
-data.forEach(item => {
-  const clienteId = item["Nombre cliente"];
-  const fechaItem = new Date(item["Fecha correspondiente"]);
-  
-  if (!ultimaInteraccionAplicaPorCliente[clienteId] || fechaItem > ultimaInteraccionAplicaPorCliente[clienteId].fecha) {
-    ultimaInteraccionAplicaPorCliente[clienteId] = {
-      aplica: item["Aplica?"],
-      fecha: fechaItem
-    };
-  }
-});
-          const acc = {};
-          const indexByClient = {};
-        
-          // Indexar interacciones por cliente
-          data.forEach(item => {
-            const clientId = item["Nombre cliente"];
-            if (!indexByClient[clientId]) indexByClient[clientId] = [];
-            indexByClient[clientId].push(item);
-          });
-        
-          // Indexar agendamientos por cliente (tomamos la más antigua)
-          const agendamientos = data.filter(item => item.Agenda === 1);
-          const fechaAgendamientoPorCliente = {};
-          agendamientos.forEach(item => {
-            const id = item["Nombre cliente"];
-            const fecha = new Date(item["Fecha correspondiente"]);
-            if (!fechaAgendamientoPorCliente[id] || fecha < fechaAgendamientoPorCliente[id]) {
-              fechaAgendamientoPorCliente[id] = fecha;
-            }
-          });
-        
-  // Agrupar todas las interacciones por mes de agendamiento
-data.forEach(item => {
-  const clienteId = item["Nombre cliente"];
-  const fechaAgenda = fechaAgendamientoPorCliente[clienteId];
-
-  if (!fechaAgenda) return; // ignorar si no hay agendamiento
-
-  const mesAgenda = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
-  if (!acc[mesAgenda]) acc[mesAgenda] = crearEstructuraMes();
-
-  // 🔥 Siempre guardar la última interacción (Aplica o No aplica)
-  const fechaItem = new Date(item["Fecha correspondiente"]);
-  if (!acc[mesAgenda].ultimasAplicablesPorCliente) {
-    acc[mesAgenda].ultimasAplicablesPorCliente = {};
-  }
-  if (
-    !acc[mesAgenda].ultimasAplicablesPorCliente[clienteId] ||
-    fechaItem > acc[mesAgenda].ultimasAplicablesPorCliente[clienteId].fecha
-  ) {
-    acc[mesAgenda].ultimasAplicablesPorCliente[clienteId] = {
-      fecha: fechaItem,
-      aplica: item["Aplica?"] // Guarda el estado (Aplica o No aplica)
-    };
-  }
-
-  // 📊 Resto de las métricas
-  acc[mesAgenda]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
-  acc[mesAgenda]["Venta Meg"] += item["Venta Meg"] || 0;
-  acc[mesAgenda]["Monto"] += item["Precio"] || 0;
-  acc[mesAgenda]["Cash collected"] += item["Cash collected total"] || 0;
-  acc[mesAgenda]["Call Confirm Exitoso"] += item["Call Confirm Exitoso"] || 0;
-
-  // Si es venta y hay intervalo, calcularlo...
-
-            if (item["Venta Meg"] > 0) {
-              const fechaVenta = new Date(item["Fecha correspondiente"]);
-            
-              // Guardar detalle para el desplegable
-              acc[mesAgenda].ventasConDetalleDeAgendamiento.push({
-                clienteId: clienteId,
-                fechaVenta: item["Fecha correspondiente"],
-                mesAgendamiento: mesAgenda
-              });
-            
-              // Calcular intervalo de días si corresponde
-              if (fechaVenta > fechaAgenda) {
-                const dias = Math.floor((fechaVenta - fechaAgenda) / (1000 * 60 * 60 * 24));
-                acc[mesAgenda].totalDiasEntreAgendaYVenta += dias;
-                acc[mesAgenda].cantidadVentasConIntervalo += 1;
-                acc[mesAgenda].intervaloPromedioDias = acc[mesAgenda].totalDiasEntreAgendaYVenta / acc[mesAgenda].cantidadVentasConIntervalo;
-              }
-            }
-            
-          });
-        
-   // Registrar cantidad de agendamientos por mes
-agendamientos.forEach(item => {
-  const clienteId = item["Nombre cliente"];
-  const fechaAgenda = new Date(item["Fecha correspondiente"]);
-  const mesKey = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
-  if (!acc[mesKey]) acc[mesKey] = crearEstructuraMes();
-  acc[mesKey].Agenda += 1;
-});
-
-// ✅ Contar las últimas interacciones aplicables por cliente en cada mes
-// 🟢 Contar las últimas interacciones "Aplica?" pero sumarlas al mes de agendamiento
-Object.entries(fechaAgendamientoPorCliente).forEach(([clienteId, fechaAgenda]) => {
-  const mesKey = `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`;
-  const ultimaInteraccion = ultimaInteraccionAplicaPorCliente[clienteId];
-
-  if (ultimaInteraccion && ultimaInteraccion.aplica === "Aplica") {
-    acc[mesKey]["Aplica?"] += 1;
-
-    // 🐞 DEBUG CLIENTES APLICANDO
-    console.log({
-      clienteId,
-      mesAgendamiento: mesKey,
-      fechaAgendamiento: fechaAgenda.toISOString().split("T")[0],
-      ultimaInteraccion: ultimaInteraccion.aplica,
-      fechaUltimaInteraccion: ultimaInteraccion.fecha.toISOString().split("T")[0],
-    });
-  }
-});
-
-
-
-
-
-return acc;
-
-        };
-        
-        const crearEstructuraMes = () => ({
-          Agenda: 0,
-          "Aplica?": 0,
-          "Llamadas efectuadas": 0,
-          "Venta Meg": 0,
-          Monto: 0,
-          "Cash collected": 0,
-          "Call Confirm Exitoso": 0, 
-          totalDiasEntreAgendaYVenta: 0,
-          cantidadVentasConIntervalo: 0,
-          intervaloPromedioDias: 0,
-          VentasPorAgendamientoDetalle: {},
-          ventasConDetalleDeAgendamiento: []
-        });
-        
-
-
-
-        const groupedData = groupDataByMonth(datosSoloDeClientesConAgendamiento);
-
-
-        // Esto genera el objeto ventasPorMes
-        const ventasPorMes = {};
-        Object.entries(groupedData).forEach(([month, data]) => {
-          ventasPorMes[month] = data.ventas || 0;
-        });
-
-        setMonthlyData(Object.entries(groupedData).sort(([a], [b]) => new Date(a) - new Date(b)));
-
-
-        // Convertir a array para ordenar
-        const monthlyEntries = Object.entries(groupedData);
-
-        const sortedMonthlyEntries = monthlyEntries.sort(([monthA], [monthB]) => {
-          const dateA = new Date(monthA);
-          const dateB = new Date(monthB);
-          return dateB - dateA;
-        });
-
-        setMonthlyData(sortedMonthlyEntries);
-        setIsLoading(false);
-
-        const closersWithSales = filteredData.filter((item) => item["Venta Meg"] > 0).map((item) => item.Responsable);
-        setAvailableClosers([...new Set(closersWithSales)]);
-
-        const validOrigins = [...new Set(filteredData.map((item) => item.Origen).filter(Boolean))]
-        setAvailableOrigins(validOrigins);
-
-        setDebugInfo(JSON.stringify(filteredByCloserAndOrigin[0] || {}, null, 2));
+    
+        setMonthlyData(filteredSortedMonthlyEntries);
+    
+        const closers = [...new Set([...ventasFiltradas.map(i => i.Responsable), ...llamadasFiltradas.map(i => i.Closer)])];
+        setAvailableClosers(closers);
+    
+        const origins = [...new Set([...ventasFiltradas.map(i => i.Origen), ...llamadasFiltradas.map(i => i["Ultimo origen"])].filter(Boolean))];
+        setAvailableOrigins(origins);
+    
       } catch (error) {
         console.error("Error fetching data:", error);
         setDebugInfo(`Error: ${error.message}`);
@@ -242,10 +68,86 @@ return acc;
         setIsLoading(false);
       }
     };
+    
 
+  
     fetchData();
-  }, [selectedCloser, selectedOrigin, API_BASE_URL]);
+  }, [selectedCloser, selectedOrigin]);
 
+  
+  const groupDataByMonth = (ventas = [], llamadas = []) => {
+    const acc = {};
+  
+    // 🔵 Procesar llamadas (de metricascliente)
+    llamadas.forEach(item => {
+      if (item["Fecha de agendamiento"] !== undefined && item["Fecha de agendamiento"] !== null) {
+        
+        if (item.Agendo === 1) {
+          const fechaAgendamiento = new Date(item["Fecha de agendamiento"]);
+  
+          if (!isNaN(fechaAgendamiento)) {
+            const mesAgendamiento = `${fechaAgendamiento.getFullYear()}-${String(fechaAgendamiento.getMonth() + 1).padStart(2, "0")}`;
+  
+            if (!acc[mesAgendamiento]) acc[mesAgendamiento] = crearEstructuraMes();
+  
+            acc[mesAgendamiento].Agenda += 1;
+  
+            if (item["Aplica N"] === "1") {
+              acc[mesAgendamiento]["Aplica?"] += 1;
+              acc[mesAgendamiento]["Call Confirm Exitoso"] += item["Call confirm exitoso"] || 0;
+            }
+            acc[mesAgendamiento]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
+          }
+        }
+      }
+    });
+  
+    // 🟠 Procesar ventas (de metricas)
+ventas.forEach(item => {
+  if (item["Fecha correspondiente"]) {
+    const fechaAgendamiento = new Date(item["Fecha correspondiente"]);
+
+  
+        if (!isNaN(fechaAgendamiento)) {
+          const mesAgendamiento = `${fechaAgendamiento.getFullYear()}-${String(fechaAgendamiento.getMonth() + 1).padStart(2, "0")}`;
+  
+          if (!acc[mesAgendamiento]) acc[mesAgendamiento] = crearEstructuraMes();
+  
+          acc[mesAgendamiento]["Venta Meg"] += item["Venta Meg"] || 0;
+          acc[mesAgendamiento]["Monto"] += item["Precio"] || 0;
+          acc[mesAgendamiento]["Cash collected"] += item["Cash collected total"] || 0;
+        }
+      }
+    });
+  
+    return acc;
+  };
+  
+  
+  
+  const crearEstructuraMes = () => ({
+    Agenda: 0,
+    "Aplica?": 0,
+    "Llamadas efectuadas": 0,
+    "Venta Meg": 0,
+    Monto: 0,
+    "Cash collected": 0,
+    "Call Confirm Exitoso": 0,
+    totalDiasEntreAgendaYVenta: 0,
+    cantidadVentasConIntervalo: 0,
+    intervaloPromedioDias: 0,
+    VentasPorAgendamientoDetalle: {},
+    ventasConDetalleDeAgendamiento: []
+  });
+  
+  const parseFechaSegura = (fechaString) => {
+    if (!fechaString) return null;
+  
+    const date = new Date(fechaString);
+    return isNaN(date) ? null : date;
+  };
+  
+  
 
   const formatMonthYear = (month) => {
     const [year, monthNumber] = month.split("-")
@@ -352,56 +254,6 @@ return acc;
   };
 
 
-  useEffect(() => {
-    const fetchGoals = async () => {
-      try {
-
-        const url = new URL("https://metricas-back.onrender.com/goals");
-        if (selectedCloser !== "all") url.searchParams.append("selectedCloser", selectedCloser);
-        if (selectedOrigin !== "all") url.searchParams.append("selectedOrigin", selectedOrigin);
-        const response = await fetch(url.toString());
-        const result = await response.json();
-
-
-
-        const formattedGoals = result.reduce((acc, item) => {
-          if (item?.month) {
-            acc[item.month] = {
-              closer: item.closer || selectedCloser || "all",
-              origin: item.origin || selectedOrigin || "all",
-              metrics: item.metrics || [
-
-                { name: "Llamadas Agendadas", goal: 0 },
-                { name: "Llamadas efectuadas", goal: 0 },
-                { name: "Venta Meg", goal: 0 },
-                { name: "Agenda", goal: 0 }
-              ]
-            };
-          }
-          return acc;
-        }, {});
-
-
-        setMonthlyGoals(prev => {
-          const merged = {
-            ...prev,
-            ...formattedGoals
-          };
-
-
-
-          return merged;
-        });
-
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Error al obtener objetivos:", error);
-        setIsLoading(false);
-      }
-    };
-
-    fetchGoals();
-  }, [selectedCloser, selectedOrigin]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amount)
@@ -450,11 +302,13 @@ return acc;
           className="p-2 border rounded-md"
         >
           <option value="all">Todos los Closers</option>
-          {availableClosers.map((closer) => (
-            <option key={closer} value={closer}>
-              {closer}
-            </option>
-          ))}
+          {availableClosers.map((closer, index) => (
+  <option key={closer || index} value={closer}>
+    {closer}
+  </option>
+))}
+
+
         </select>
 
         <select
@@ -463,11 +317,12 @@ return acc;
           className="p-2 border rounded-md"
         >
           <option value="all">Todos los Orígenes</option>
-          {availableOrigins.map((origin) => (
-            <option key={origin} value={origin}>
-              {origin}
-            </option>
-          ))}
+          {availableOrigins.map((origin, index) => (
+  <option key={origin || index} value={origin}>
+    {origin}
+  </option>
+))}
+
         </select>
       </div>
 
@@ -667,7 +522,14 @@ return acc;
                   <div className="bg-gray-50 p-1 rounded-md border border-gray-200">
                     <div className="flex justify-between items-center">
                       <span className="text-md font-semibold text-gray-700 w-[40%]">Llamadas Vendidas</span>
-                      <span className="text-md font-bold text-gray-700 w-[20%]  text-center ">{totals["Venta Meg"]}</span>
+                      <span className="text-md font-bold text-gray-700 w-[20%] text-center">
+  <VentasVendidasPorAgendamiento
+    month={month}
+    closer={selectedCloser}
+    origin={selectedOrigin}
+  />
+</span>
+
                       <span className="text-md font-bold text-gray-700 w-[20%] text-end">
                         {!isNaN(parseFloat(totals["Venta Meg"])) &&
                           !isNaN(parseFloat(totals["Llamadas efectuadas"])) &&
