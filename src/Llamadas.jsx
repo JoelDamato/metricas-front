@@ -43,8 +43,25 @@ export default function SalesMetricsTable() {
         });
     
         const llamadasFiltradas = metricasClienteData.filter(item => item.Agendo === 1);
-    
-        const groupedData = groupDataByMonth(ventasFiltradas, llamadasFiltradas);
+
+        // Filtros aplicados por origen y closer
+        const ventasFiltradasConOrigen = selectedOrigin !== "all"
+          ? ventasFiltradas.filter(item => item.Origen === selectedOrigin)
+          : ventasFiltradas;
+        
+        const llamadasFiltradasConOrigen = selectedOrigin !== "all"
+          ? llamadasFiltradas.filter(item => item["Ultimo origen"] === selectedOrigin)
+          : llamadasFiltradas;
+        
+        const ventasFiltradasFinal = selectedCloser !== "all"
+          ? ventasFiltradasConOrigen.filter(item => item.Responsable === selectedCloser)
+          : ventasFiltradasConOrigen;
+        
+        const llamadasFiltradasFinal = selectedCloser !== "all"
+          ? llamadasFiltradasConOrigen.filter(item => item.Closer === selectedCloser)
+          : llamadasFiltradasConOrigen;
+            
+          const groupedData = groupDataByMonth(ventasFiltradasFinal, llamadasFiltradasFinal);
     
         const sortedMonthlyEntries = Object.entries(groupedData).sort(([a], [b]) => new Date(b) - new Date(a));
     
@@ -58,8 +75,13 @@ export default function SalesMetricsTable() {
         const closers = [...new Set([...ventasFiltradas.map(i => i.Responsable), ...llamadasFiltradas.map(i => i.Closer)])];
         setAvailableClosers(closers);
     
-        const origins = [...new Set([...ventasFiltradas.map(i => i.Origen), ...llamadasFiltradas.map(i => i["Ultimo origen"])].filter(Boolean))];
-        setAvailableOrigins(origins);
+        const origenesVentas = new Set(ventasFiltradas.map(i => i.Origen).filter(Boolean));
+        const origenesLlamadas = new Set(llamadasFiltradas.map(i => i["Ultimo origen"]).filter(Boolean));
+        
+        // Intersección entre ambos
+        const origenesComunes = [...origenesVentas].filter(origen => origenesLlamadas.has(origen));
+        setAvailableOrigins(origenesComunes);
+        
     
       } catch (error) {
         console.error("Error fetching data:", error);
