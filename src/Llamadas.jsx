@@ -5,12 +5,19 @@ import "react-datepicker/dist/react-datepicker.css"
 import VentasPorFechaConAgendamiento from "../components/VentasPorFechaConAgendamiento"; // adaptá ruta
 import VentasVendidasPorAgendamiento from "../components/VentasVendidasPorAgendamiento";
 import ResumenPorRango from "../components/CardRango"
+import { useData } from "../components/DataContext";
 
 export default function SalesMetricsTable() {
 
+  const {
+    metricasData: rawVentas,
+    metricasClienteData: rawLlamadas,
+    loading: isLoading,
+  } = useData();
+
   const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/metricas"
-    : "https://metricas-back.onrender.com/metricas"
+    : "http://localhost:30003/metricas"
 
 
   const [monthlyData, setMonthlyData] = useState([])
@@ -18,7 +25,6 @@ export default function SalesMetricsTable() {
   const [availableOrigins, setAvailableOrigins] = useState([])
   const [selectedCloser, setSelectedCloser] = useState("all")
   const [selectedOrigin, setSelectedOrigin] = useState("all")
-  const [isLoading, setIsLoading] = useState(true)
   const [monthlyGoals, setMonthlyGoals] = useState({});
   const [debugInfo, setDebugInfo] = useState("")
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -26,76 +32,51 @@ export default function SalesMetricsTable() {
   const [pendingMonthToSave, setPendingMonthToSave] = useState(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-    
-        const [metricasResponse, metricasClienteResponse] = await Promise.all([
-          fetch("https://metricas-back.onrender.com/metricas"),
-          fetch("https://metricas-back.onrender.com/metricascliente")
-        ]);
-    
-        const metricasData = await metricasResponse.json();
-        const metricasClienteData = await metricasClienteResponse.json();
-    
-        const ventasFiltradas = metricasData.filter(item => {
-          return !isNaN(new Date(item["Fecha correspondiente"]));
-        });
-    
-        const llamadasFiltradas = metricasClienteData.filter(item => item.Agendo === 1);
+    if (!rawVentas.length && !rawLlamadas.length) return;
 
-        // Filtros aplicados por origen y closer
-        const ventasFiltradasConOrigen = selectedOrigin !== "all"
-          ? ventasFiltradas.filter(item => item.Origen === selectedOrigin)
-          : ventasFiltradas;
-        
-        const llamadasFiltradasConOrigen = selectedOrigin !== "all"
-          ? llamadasFiltradas.filter(item => item["Ultimo origen"] === selectedOrigin)
-          : llamadasFiltradas;
-        
-        const ventasFiltradasFinal = selectedCloser !== "all"
-          ? ventasFiltradasConOrigen.filter(item => item.Responsable === selectedCloser)
-          : ventasFiltradasConOrigen;
-        
-        const llamadasFiltradasFinal = selectedCloser !== "all"
-          ? llamadasFiltradasConOrigen.filter(item => item.Closer === selectedCloser)
-          : llamadasFiltradasConOrigen;
-            
-          const groupedData = groupDataByMonth(ventasFiltradasFinal, llamadasFiltradasFinal);
-    
-        const sortedMonthlyEntries = Object.entries(groupedData).sort(([a], [b]) => new Date(b) - new Date(a));
-    
-        const filteredSortedMonthlyEntries = sortedMonthlyEntries.filter(([month]) => {
-          const [year] = month.split("-").map(Number);
-          return year > 2024; // solo 2025 en adelante
-        });
-    
-        setMonthlyData(filteredSortedMonthlyEntries);
-    
-        const closers = [...new Set([...ventasFiltradas.map(i => i.Responsable), ...llamadasFiltradas.map(i => i.Closer)])];
-        setAvailableClosers(closers);
-    
-        const origenesVentas = new Set(ventasFiltradas.map(i => i.Origen).filter(Boolean));
-        const origenesLlamadas = new Set(llamadasFiltradas.map(i => i["Ultimo origen"]).filter(Boolean));
-        
-        // Intersección entre ambos
-        const origenesComunes = [...origenesVentas].filter(origen => origenesLlamadas.has(origen));
-        setAvailableOrigins(origenesComunes);
-        
-    
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        setDebugInfo(`Error: ${error.message}`);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
+    const closers = [...new Set(
+      rawLlamadas.filter(i => i.Agendo === 1 && i.Closer).map(i => i.Closer)
+    )];
+    setAvailableClosers(closers);
 
-  
-    fetchData();
-  }, [selectedCloser, selectedOrigin]);
+    const origenesVentas = new Set(rawVentas.map(i => i.Origen).filter(Boolean));
+    const origenesLlamadas = new Set(rawLlamadas.map(i => i["Ultimo origen"]).filter(Boolean));
+    const origenesComunes = [...origenesVentas].filter(origen => origenesLlamadas.has(origen));
+    setAvailableOrigins(origenesComunes);
+  }, [rawVentas, rawLlamadas]);
 
+  // 2️⃣ Filtrar datos por filtros seleccionados
+  useEffect(() => {
+    if (!rawVentas.length && !rawLlamadas.length) return;
+
+    const ventasFiltradas = rawVentas.filter(item => !isNaN(new Date(item["Fecha correspondiente"])));
+    const llamadasFiltradas = rawLlamadas.filter(item => item.Agendo === 1);
+
+    const ventasConOrigen = selectedOrigin !== "all"
+      ? ventasFiltradas.filter(item => item.Origen === selectedOrigin)
+      : ventasFiltradas;
+
+    const llamadasConOrigen = selectedOrigin !== "all"
+      ? llamadasFiltradas.filter(item => item["Ultimo origen"] === selectedOrigin)
+      : llamadasFiltradas;
+
+    const ventasFinal = selectedCloser !== "all"
+      ? ventasConOrigen.filter(item => item.Responsable === selectedCloser)
+      : ventasConOrigen;
+
+    const llamadasFinal = selectedCloser !== "all"
+      ? llamadasConOrigen.filter(item => item.Closer === selectedCloser)
+      : llamadasConOrigen;
+
+    const grouped = groupDataByMonth(ventasFinal, llamadasFinal);
+    const sorted = Object.entries(grouped).sort(([a], [b]) => new Date(b) - new Date(a));
+    const filteredSorted = sorted.filter(([month]) => {
+      const [year] = month.split("-").map(Number);
+      return year > 2024;
+    });
+
+    setMonthlyData(filteredSorted);
+  }, [selectedCloser, selectedOrigin, rawVentas, rawLlamadas]);
   
   const groupDataByMonth = (ventas = [], llamadas = []) => {
     const acc = {};
@@ -123,24 +104,83 @@ export default function SalesMetricsTable() {
         }
       }
     });
-  
-    // 🟠 Procesar ventas (de metricas)
-ventas.forEach(item => {
-  if (item["Fecha correspondiente"]) {
-    const fechaAgendamiento = new Date(item["Fecha correspondiente"]);
 
-  
-        if (!isNaN(fechaAgendamiento)) {
-          const mesAgendamiento = `${fechaAgendamiento.getFullYear()}-${String(fechaAgendamiento.getMonth() + 1).padStart(2, "0")}`;
-  
-          if (!acc[mesAgendamiento]) acc[mesAgendamiento] = crearEstructuraMes();
-  
-          acc[mesAgendamiento]["Venta Meg"] += item["Venta Meg"] || 0;
-          acc[mesAgendamiento]["Monto"] += item["Precio"] || 0;
-          acc[mesAgendamiento]["Cash collected"] += item["Cash collected total"] || 0;
+
+    // 🔴 Agregá esto antes del forEach
+const cashAbrilEsperado = new Set([
+  "1e3482517a9580a0bf08d8f00090230c",
+  "1e3482517a9580b5ac19d5e3a033aaf6",
+  "1e0482517a9580968b38e93423367087",
+  "1df482517a958086a3f6c97cc5fe52c3",
+  "1de482517a958086ae56c6b101abc3ee",
+  "1de482517a958088a876d97f30fb4f89",
+  "1dd482517a9580abaf62c3d50a9f12a6",
+  "1dd482517a958093b77fdfb530600866",
+  "1d9482517a958063a4fdcddab21c492f",
+  "1d9482517a9580a6aa7dfc203e0610b8",
+  "1d8482517a958006ad9ffd19483a2ca3",
+  "1d6482517a95800099b5c0876923e949",
+  "1d0482517a9580168cbfde6d7c541997",
+  "1ce482517a9580cba337fde53d024e26",
+]);
+
+let totalCashAbril = 0;
+let totalPrecioAbril = 0;
+const idsYaSumados = new Set();
+
+ventas.forEach(item => {
+  if (item["Fecha de agendamiento"] && item["Venta Club"] !== 1) {
+    const fechaAgendamiento = new Date(item["Fecha de agendamiento"]);
+    if (!isNaN(fechaAgendamiento)) {
+      const mesAgendamiento = `${fechaAgendamiento.getFullYear()}-${String(fechaAgendamiento.getMonth() + 1).padStart(2, "0")}`;
+
+      const rawId = item.id || item.ID || item.Id;
+      const id = rawId?.replace(/-/g, ""); // ✅ sin guiones
+
+      const cash = item["Cash collected total"] || 0;
+      const precio = item["Precio"] || 0;
+
+      if (!acc[mesAgendamiento]) acc[mesAgendamiento] = crearEstructuraMes();
+      acc[mesAgendamiento]["Venta Meg"] += item["Venta Meg"] || 0;
+      acc[mesAgendamiento]["Monto"] += precio;
+      acc[mesAgendamiento]["Cash collected"] += cash;
+
+      // Solo para abril
+      if (mesAgendamiento === "2025-04" && cash > 0) {
+        const incluido = cashAbrilEsperado.has(id);
+        if (incluido) {
+          totalCashAbril += cash;
+          totalPrecioAbril += precio;
+          idsYaSumados.add(id);
         }
+
+        console.log("[CASH DETECTADO ABRIL]", {
+          idOriginal: rawId,
+          idSinGuiones: id,
+          cash,
+          precio,
+          incluido
+        });
       }
-    });
+    }
+  }
+});
+
+// 🔍 Resumen y control de IDs faltantes
+console.log("💰 TOTAL CASH ABRIL:", totalCashAbril.toFixed(2));
+console.log("💵 TOTAL PRECIO ABRIL:", totalPrecioAbril.toFixed(2));
+console.log("📊 % REAL COBRADO:", ((totalCashAbril / totalPrecioAbril) * 100).toFixed(2) + "%");
+
+const idsFaltantes = [...cashAbrilEsperado].filter(id => !idsYaSumados.has(id));
+if (idsFaltantes.length > 0) {
+  console.warn("⚠️ IDs ESPERADOS NO ENCONTRADOS O NO INCLUIDOS:");
+  console.table(idsFaltantes);
+} else {
+  console.log("✅ Todos los IDs esperados fueron incluidos.");
+}
+
+    
+
   
     return acc;
   };
@@ -311,10 +351,35 @@ ventas.forEach(item => {
   };
 
 
+// Dentro del componente...
+const [progress, setProgress] = useState(0);
+
+useEffect(() => {
+  if (!isLoading) {
+    setProgress(0);
+    return;
+  }
+
+  const interval = setInterval(() => {
+    setProgress(prev => {
+      if (prev >= 100) {
+        clearInterval(interval);
+        return 100;
+      }
+      return prev + 2; // 2.5% cada segundo => 40 segundos total
+    });
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [isLoading]);
+
+
 
   return (
     <div className="p-4">
-
+    <h1 className="p-5 text-4xl md:mb-10 md:text-6xl font-bold text-center text-transparent bg-gradient-to-b from-gray-900 to-gray-600 bg-clip-text drop-shadow-lg tracking-wide">
+      Metricas por agendamiento
+          </h1>
 
       <ToastContainer position="bottom-right" />
       <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
@@ -349,12 +414,22 @@ ventas.forEach(item => {
       </div>
 
       {isLoading ? (
- <div className="flex justify-center items-center min-h-screen">
+ <div className="flex flex-col justify-center items-center min-h-screen gap-4">
  <img
    src="https://i.ibb.co/8XqZgCk/2-1.png"
    alt="Cargando..."
    className="w-full sm:w-1/4 transition-transform transform hover:scale-110 animate-pulse"
  />
+
+ {/* 🔵 Barra de progreso */}
+ <div className="w-3/4 sm:w-1/3 h-2 bg-gray-200 rounded-full overflow-hidden mt-2">
+   <div
+     className="h-full bg-black transition-all duration-100"
+     style={{ width: `${progress}%` }}
+   />
+ </div>
+
+ <p className="text-sm text-gray-600">{Math.min(progress.toFixed(0), 100)}% cargado</p>
 </div>
       ) : (
 
@@ -546,6 +621,7 @@ ventas.forEach(item => {
                       <span className="text-md font-semibold text-gray-700 w-[40%]">Llamadas Vendidas</span>
                       <span className="text-md font-bold text-gray-700 w-[20%] text-center">
   <VentasVendidasPorAgendamiento
+   rawVentas={rawVentas}
     month={month}
     closer={selectedCloser}
     origin={selectedOrigin}
@@ -597,6 +673,7 @@ ventas.forEach(item => {
                   {/* 🧾 Ventas por Submes */}
 
                   <VentasPorFechaConAgendamiento
+                   rawVentas={rawVentas}
 month={month}
 closer={selectedCloser}
 origin={selectedOrigin}

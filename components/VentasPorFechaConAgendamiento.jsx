@@ -1,83 +1,77 @@
 import { useEffect, useState } from "react";
 
-export default function VentasConAgendamientoAgrupadas({ month, startDate, endDate, closer = "all", origin = "all" }) {
+export default function VentasConAgendamientoAgrupadas({
+  month,
+  startDate,
+  endDate,
+  closer = "all",
+  origin = "all",
+  rawVentas = []
+}) {
   const [ventasAgrupadas, setVentasAgrupadas] = useState([]);
   const [totalVentas, setTotalVentas] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_URL = "https://metricas-back.onrender.com/metricas";
-
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(API_URL);
-        const data = await response.json();
+    setIsLoading(true);
 
-        // Filtrar por closer y origen
-        const filtrados = data.filter((item) => {
-          const matchCloser = closer === "all" || item.Responsable === closer;
-          const matchOrigin = origin === "all" || item.Origen === origin;
-          return matchCloser && matchOrigin && item["Venta Meg"] > 0 && item["Fecha correspondiente"];
-        });
+    // 🔍 Filtrar por closer y origen
+    const filtrados = rawVentas.filter((item) => {
+      const matchCloser = closer === "all" || item.Responsable === closer;
+      const matchOrigin = origin === "all" || item.Origen === origin;
+      return matchCloser && matchOrigin && item["Venta Meg"] > 0 && item["Fecha correspondiente"];
+    });
 
-        // Ventas filtradas según modo
-        let ventas = [];
-        if (month) {
-          ventas = filtrados.filter((item) => {
-            const fecha = new Date(item["Fecha correspondiente"]);
-            const ventaMonth = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
-            return ventaMonth === month;
-          });
-        } else if (startDate && endDate) {
-          ventas = filtrados.filter((item) => {
-            const fecha = new Date(item["Fecha correspondiente"]);
-            return fecha >= startDate && fecha <= endDate;
-          });
+    // 🗓️ Filtrar por mes o rango
+    let ventas = [];
+    if (month) {
+      ventas = filtrados.filter((item) => {
+        const fecha = new Date(item["Fecha correspondiente"]);
+        const ventaMonth = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
+        return ventaMonth === month;
+      });
+    } else if (startDate && endDate) {
+      ventas = filtrados.filter((item) => {
+        const fecha = new Date(item["Fecha correspondiente"]);
+        return fecha >= startDate && fecha <= endDate;
+      });
+    }
+
+    setTotalVentas(ventas.length);
+
+    // 🧠 Indexar fecha de agendamiento por cliente
+    const fechaAgendamientoPorCliente = {};
+    rawVentas.forEach(item => {
+      if (item.Agenda === 1) {
+        const clienteId = item["Nombre cliente"];
+        const fecha = new Date(item["Fecha correspondiente"]);
+        if (!fechaAgendamientoPorCliente[clienteId] || fecha < fechaAgendamientoPorCliente[clienteId]) {
+          fechaAgendamientoPorCliente[clienteId] = fecha;
         }
-
-        setTotalVentas(ventas.length);
-
-        // Indexar agendamiento más antiguo por cliente
-        const fechaAgendamientoPorCliente = {};
-        data.forEach(item => {
-          if (item.Agenda === 1) {
-            const clienteId = item["Nombre cliente"];
-            const fecha = new Date(item["Fecha correspondiente"]);
-            if (!fechaAgendamientoPorCliente[clienteId] || fecha < fechaAgendamientoPorCliente[clienteId]) {
-              fechaAgendamientoPorCliente[clienteId] = fecha;
-            }
-          }
-        });
-
-        // Agrupar ventas por mes de agendamiento
-        const agrupadas = ventas.reduce((acc, venta) => {
-          const clienteId = venta["Nombre cliente"];
-          const fechaAgenda = fechaAgendamientoPorCliente[clienteId];
-          const mesAgendamiento = fechaAgenda
-            ? `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`
-            : "Sin fecha de agendamiento";
-
-          acc[mesAgendamiento] = (acc[mesAgendamiento] || 0) + 1;
-          return acc;
-        }, {});
-
-        const agrupadasArray = Object.entries(agrupadas).sort(([a], [b]) => {
-          if (a === "Sin fecha de agendamiento") return 1;
-          if (b === "Sin fecha de agendamiento") return -1;
-          return new Date(b) - new Date(a);
-        });
-
-        setVentasAgrupadas(agrupadasArray);
-      } catch (error) {
-        console.error("Error cargando ventas:", error);
-      } finally {
-        setIsLoading(false);
       }
-    };
+    });
 
-    fetchData();
-  }, [month, startDate, endDate, closer, origin]);
+    // 📊 Agrupar por mes de agendamiento
+    const agrupadas = ventas.reduce((acc, venta) => {
+      const clienteId = venta["Nombre cliente"];
+      const fechaAgenda = fechaAgendamientoPorCliente[clienteId];
+      const mesAgendamiento = fechaAgenda
+        ? `${fechaAgenda.getFullYear()}-${String(fechaAgenda.getMonth() + 1).padStart(2, "0")}`
+        : "Sin fecha de agendamiento";
+
+      acc[mesAgendamiento] = (acc[mesAgendamiento] || 0) + 1;
+      return acc;
+    }, {});
+
+    const agrupadasArray = Object.entries(agrupadas).sort(([a], [b]) => {
+      if (a === "Sin fecha de agendamiento") return 1;
+      if (b === "Sin fecha de agendamiento") return -1;
+      return new Date(b) - new Date(a);
+    });
+
+    setVentasAgrupadas(agrupadasArray);
+    setIsLoading(false);
+  }, [month, startDate, endDate, closer, origin, rawVentas]);
 
   const formatMonthYear = (monthKey) => {
     if (!monthKey || monthKey === "Sin fecha de agendamiento") return "Sin fecha de agendamiento";

@@ -4,19 +4,21 @@ import { Chart } from "chart.js/auto";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import es from "date-fns/locale/es";
+import { useData } from "../components/DataContext"; // 👈 más limpio
+
 
 import { ToastContainer, toast } from 'react-toastify';
 
 
 const DashboardTable = () => {
-  const API_URL = process.env.NODE_ENV === "production"
+  const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/"
-    : "https://metricas-back.onrender.com/"
+    : "http://localhost:30003/"
 
 
-
-
-  const [data, setData] = useState([]);
+  const { dashboardData } = useData(); // 👈 directamente desde el contexto
+  const data = dashboardData;
+    
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
   const [closers, setClosers] = useState([]);
   const [closerFilter, setCloserFilter] = useState("");
@@ -33,6 +35,9 @@ const DashboardTable = () => {
 
 
 
+
+
+
   const handleDateChange = (update) => {
     setDateRange(update);
     if (update.length === 2) {
@@ -42,18 +47,12 @@ const DashboardTable = () => {
 
   //fetch data para traer la informacion de la api
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get(`${API_URL}dashboard`);
-        setData(response.data);
-        const uniqueClosers = [...new Set(response.data.map(item => item["Closer Sub"]))];
-        setClosers(uniqueClosers);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
-    fetchData();
-  }, []);
+    if (data.length > 0) {
+      const uniqueClosers = [...new Set(data.map(item => item["Closer Sub"]))];
+      setClosers(uniqueClosers);
+    }
+  }, [data]);
+  
 console.log('data', data)
   //useEffect para calcular los totales de ventas por closer
   useEffect(() => {
@@ -639,7 +638,9 @@ Object.values(resumenPorCloser).forEach((resumen) => {
   return (
     <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
       <ToastContainer position="bottom-right" />
-      <h2 className="text-xl font-semibold text-gray-700 mb-4">Dashboard de Ventas</h2>
+      <h1 className="p-5 text-4xl md:mb-10 md:text-6xl font-bold text-center text-transparent bg-gradient-to-b from-gray-900 to-gray-600 bg-clip-text drop-shadow-lg tracking-wide">
+      Dashboard de Ventas
+          </h1>
       <div className=" gap-4 mb-6 flex flex-col justify-center items-center md:flex-row md:items-center md:justify-between">
         <DatePicker
           selected={startDate}
@@ -676,11 +677,8 @@ Object.values(resumenPorCloser).forEach((resumen) => {
         <h3 className="text-lg font-semibold text-gray-700 mt-6 text-center">Tendencia de Ventas</h3>
 
         <div className="relative w-full max-w-4xl h-[350px] sm:h-[400px] md:h-[500px] lg:h-[600px] flex items-center justify-center bg-white rounded-lg shadow-md">
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg shadow-md">
-              <div className="w-10 h-10 border-4 border-[#E0C040] border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
+
+
           <canvas ref={canvasRef} className="w-full h-full"></canvas>
         </div>
       </div>
