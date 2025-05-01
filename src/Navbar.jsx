@@ -23,7 +23,7 @@ const Navbar = () => {
       <div className="container mx-auto flex justify-between items-center h-full px-6">
         {/* Logo */}
         <Link to="/" className="text-xl font-bold hover:text-[#E0C040] transition">
-          Matias Randazzo
+         <img src="https://i.ibb.co/21cCrjVN/Diseo-sin-ttulo-3.webp" className="w-[100px] h-[100px]" alt="" />
         </Link>
        
         {/* Menú hamburguesa */}
