@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import UpdateButton from "../components/Update";
 
 const Navbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -24,9 +25,10 @@ const Navbar = () => {
         <Link to="/" className="text-xl font-bold hover:text-[#E0C040] transition">
           Matias Randazzo
         </Link>
-
+       
         {/* Menú hamburguesa */}
         <div ref={dropdownRef} className="relative">
+          
           <button
             onClick={toggleDropdown}
             aria-expanded={isDropdownOpen}
@@ -73,10 +75,13 @@ const Navbar = () => {
                   Ranking
                 </Link>
               </li>
+              <UpdateButton />
             </ul>
+            
           )}
         </div>
       </div>
+      
     </nav>
   );
 };

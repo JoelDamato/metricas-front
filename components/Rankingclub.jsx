@@ -1,29 +1,22 @@
 import { useContext, useEffect, useState } from "react";
 import { DataContext } from "../components/DataContext";
 
-
 const DashboardClub = () => {
   const [monthlyRankings, setMonthlyRankings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_BASE_URL =
-    process.env.NODE_ENV === "production"
-      ? "https://metricas-back.onrender.com/club"
-      : "http://localhost:30003/club";
+  const { clubData } = useContext(DataContext);
 
   const monthNames = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
 
-  const { metricasData } = useContext(DataContext);
-
   useEffect(() => {
-    if (!metricasData.length) return;
-  
+    if (!clubData.length) return;
     const currentYear = new Date().getFullYear();
-  
-    const filteredData = metricasData.filter(item => {
+
+    const filteredData = clubData.filter(item => {
       const date = new Date(item["Fecha correspondiente"]);
       return (
         !isNaN(date) &&
@@ -31,29 +24,33 @@ const DashboardClub = () => {
         parseInt(item["Venta Club"] || 0) === 1
       );
     });
-  
+
     const groupedByMonth = filteredData.reduce((acc, curr) => {
       const date = new Date(curr["Fecha correspondiente"]);
       const monthIndex = date.getMonth();
       const year = date.getFullYear();
       const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-  
+
       if (!acc[monthKey]) {
         acc[monthKey] = { year, monthIndex, entries: [] };
       }
-  
+
       const closer = curr["Responsable"]?.trim() || "Desconocido";
-  
+      const precioUsd = parseFloat(curr["Precio"] || 0);
+      const tc = parseFloat(curr["Tc"] || 0);
+      const facturacionPesos = !isNaN(precioUsd) && !isNaN(tc) ? precioUsd * tc : 0;
+
       acc[monthKey].entries.push({
         closer,
-        cashCollected: parseFloat(curr["Cash collected total"] || 0),
+        cashCollected: parseFloat(curr["Cash collected"] || 0),
         offersWon: 1,
-        facturacion: parseFloat(curr["Precio"] || 0),
+        facturacion: precioUsd,
+        facturacionPesos,
       });
-  
+
       return acc;
     }, {});
-  
+
     const rankings = Object.values(groupedByMonth)
       .sort((a, b) => new Date(b.year, b.monthIndex, 1) - new Date(a.year, a.monthIndex, 1))
       .map(({ year, monthIndex, entries }) => {
@@ -63,24 +60,30 @@ const DashboardClub = () => {
             existing.cashCollected += curr.cashCollected;
             existing.offersWon += curr.offersWon;
             existing.facturacion += curr.facturacion;
+            existing.facturacionPesos += curr.facturacionPesos;
           } else {
-            acc.push({ ...curr });
+            acc.push({
+              ...curr,
+              facturacionPesos: curr.facturacionPesos || 0,
+            });
           }
           return acc;
         }, []);
-  
+
         const processedEntries = aggregatedEntries
           .filter(item => item.offersWon > 0)
+          .map(item => ({
+            ...item,
+            precioPromedio: item.offersWon > 0 ? item.facturacionPesos / item.offersWon : 0,
+          }))
           .sort((a, b) => b.cashCollected - a.cashCollected);
-  
+
         const totalCashCollected = processedEntries.reduce((sum, item) => sum + item.cashCollected, 0);
         const totalOffersWon = processedEntries.reduce((sum, item) => sum + item.offersWon, 0);
         const totalFacturacion = processedEntries.reduce((sum, item) => sum + item.facturacion, 0);
-  
-        const porcentajeRecaudado = totalFacturacion > 0
-          ? ((totalCashCollected / totalFacturacion) * 100).toFixed(2)
-          : "N/A";
-  
+        const totalFacturacionPesos = processedEntries.reduce((sum, item) => sum + item.facturacionPesos, 0);
+        const precioPromedioTotal = totalOffersWon > 0 ? totalFacturacionPesos / totalOffersWon : 0;
+
         return {
           month: `${monthNames[monthIndex]} ${year}`,
           ranking: processedEntries,
@@ -88,15 +91,16 @@ const DashboardClub = () => {
             cashCollected: totalCashCollected,
             offersWon: totalOffersWon,
             facturacion: totalFacturacion,
-            porcentajeRecaudado,
+            facturacionPesos: totalFacturacionPesos,
+            precioPromedio: precioPromedioTotal
           },
         };
       });
-  
+
     setMonthlyRankings(rankings);
     setIsLoading(false);
-  }, [metricasData]);
-  
+  }, [clubData]);
+
   return (
     <div className="p-4 bg-gray-300 min-h-screen overflow-x-auto">
       {isLoading ? (
@@ -119,44 +123,50 @@ const DashboardClub = () => {
                 <table className="w-full table-auto text-left text-gray-700 text-sm md:text-base">
                   <thead>
                     <tr className="bg-gray-200">
-                      <th></th>
+                      <th>#</th>
                       <th>Closer</th>
+                      <th>Ventas</th>
+                      <th>Facturación USD</th>
+                      <th>Facturación ARS</th>
                       <th>Cash Collected</th>
-                      <th>%</th>
-                      <th>Venta</th>
-                      <th>Facturación</th>
+                      <th>Precio Promedio</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {ranking.map((item, index) => {
-                      const cashVsFacturacion = item.facturacion > 0
-                        ? ((item.cashCollected / item.facturacion) * 100).toFixed(2) + "%"
-                        : "N/A";
-                      return (
-                        <tr key={index} className="hover:bg-gray-100 cursor-pointer">
-                          <td className="py-1 px-1 border-b">{index + 1}</td>
-                          <td className="py-2 px-4 border-b">{item.closer}</td>
-                          <td className="py-2 px-4 border-b">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(item.cashCollected)}
-                          </td>
-                          <td className="py-2 px-4 border-b">{cashVsFacturacion}</td>
-                          <td className="py-2 px-4 border-b">{item.offersWon}</td>
-                          <td className="py-2 px-4 border-b">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(item.facturacion)}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {ranking.map((item, index) => (
+                      <tr key={index} className="hover:bg-gray-100 cursor-pointer">
+                        <td className="py-1 px-2 border-b">{index + 1}</td>
+                        <td className="py-2 px-4 border-b">{item.closer}</td>
+                        <td className="py-2 px-4 border-b">{item.offersWon}</td>
+                        <td className="py-2 px-4 border-b">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(item.facturacion)}
+                        </td>
+                        <td className="py-2 px-4 border-b">
+                          {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(item.facturacionPesos)}
+                        </td>
+                        <td className="py-2 px-4 border-b">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(item.cashCollected)}
+                        </td>
+                        <td className="py-2 px-4 border-b">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(item.precioPromedio)}
+                        </td>
+                      </tr>
+                    ))}
                     <tr className="bg-gray-300 font-bold">
                       <td className="py-2 px-4 border-t">Total</td>
                       <td className="py-2 px-4 border-t"></td>
-                      <td className="py-2 px-4 border-b">
+                      <td className="py-2 px-4 border-t">{totals.offersWon}</td>
+                      <td className="py-2 px-4 border-t">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.facturacion)}
+                      </td>
+                      <td className="py-2 px-4 border-t">
+                        {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(totals.facturacionPesos)}
+                      </td>
+                      <td className="py-2 px-4 border-t">
                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.cashCollected)}
                       </td>
-                      <td className="py-2 px-4 border-t">{totals.porcentajeRecaudado}%</td>
-                      <td className="py-2 px-4 border-t">{totals.offersWon}</td>
-                      <td className="py-2 px-4 border-b">
-                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.facturacion)}
+                      <td className="py-2 px-4 border-t">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.precioPromedio)}
                       </td>
                     </tr>
                   </tbody>
