@@ -107,7 +107,7 @@ const RankingClub = () => {
 
   const fetchPrecios = async () => {
     try {
-      const res = await fetch(" http://localhost:30003/precio-club");
+      const res = await fetch("https://metricas-back.onrender.com/precio-club");
       const data = await res.json();
       console.log("📦 Datos recibidos de /precio-club:", data);
   
@@ -138,7 +138,7 @@ const RankingClub = () => {
     setGuardandoMes(monthKey);
   
     try {
-      const res = await fetch("http://localhost:30003/precio-club", {
+      const res = await fetch("https://metricas-back.onrender.com/precio-club", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
