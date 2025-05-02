@@ -339,7 +339,7 @@ ventas.forEach(item => {
   useEffect(() => {
     const fetchGoals = async () => {
       try {
-        const url = new URL("http://localhost:30003/goals");
+        const url = new URL("https://metricas-back.onrender.com/goals");
         if (selectedCloser !== "all") url.searchParams.append("selectedCloser", selectedCloser);
         if (selectedOrigin !== "all") url.searchParams.append("selectedOrigin", selectedOrigin);
   
