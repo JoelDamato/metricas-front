@@ -166,22 +166,8 @@ ventas.forEach(item => {
   }
 });
 
-// 🔍 Resumen y control de IDs faltantes
-console.log("💰 TOTAL CASH ABRIL:", totalCashAbril.toFixed(2));
-console.log("💵 TOTAL PRECIO ABRIL:", totalPrecioAbril.toFixed(2));
-console.log("📊 % REAL COBRADO:", ((totalCashAbril / totalPrecioAbril) * 100).toFixed(2) + "%");
-
-const idsFaltantes = [...cashAbrilEsperado].filter(id => !idsYaSumados.has(id));
-if (idsFaltantes.length > 0) {
-  console.warn("⚠️ IDs ESPERADOS NO ENCONTRADOS O NO INCLUIDOS:");
-  console.table(idsFaltantes);
-} else {
-  console.log("✅ Todos los IDs esperados fueron incluidos.");
-}
 
     
-
-  
     return acc;
   };
   
@@ -349,6 +335,49 @@ if (idsFaltantes.length > 0) {
       toast.error("No tiene permisos para ejecutar la acción");
     }
   };
+
+  useEffect(() => {
+    const fetchGoals = async () => {
+      try {
+        const url = new URL("http://localhost:30003/goals");
+        if (selectedCloser !== "all") url.searchParams.append("selectedCloser", selectedCloser);
+        if (selectedOrigin !== "all") url.searchParams.append("selectedOrigin", selectedOrigin);
+  
+        const response = await fetch(url.toString());
+        const result = await response.json();
+  
+        const formattedGoals = result.reduce((acc, item) => {
+          if (item?.month) {
+            acc[item.month] = {
+              closer: item.closer || selectedCloser || "all",
+              origin: item.origin || selectedOrigin || "all",
+              metrics: item.metrics || [
+                { name: "Llamadas Agendadas", goal: 0 },
+                { name: "Llamadas efectuadas", goal: 0 },
+                { name: "Venta Meg", goal: 0 },
+                { name: "Agenda", goal: 0 }
+              ]
+            };
+          }
+          return acc;
+        }, {});
+  
+        setMonthlyGoals(prev => ({
+          ...prev,
+          ...formattedGoals
+        }));
+  
+      } catch (err) {
+        console.error("❌ Error al obtener los objetivos:", err);
+        toast.error("No se pudieron cargar los objetivos");
+      }
+    };
+  
+   
+      fetchGoals();
+    
+  }, [selectedCloser, selectedOrigin]);
+  
 
 
 // Dentro del componente...

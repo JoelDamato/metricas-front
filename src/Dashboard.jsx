@@ -513,7 +513,7 @@ Object.values(resumenPorCloser).forEach((resumen) => {
         "Recuperado": ((stats.agendas > 0 ? stats.recuperados / stats.agendas : 0) * 100).toFixed(2) + "%",
         "Descalificados": (stats.agendas > 0 ? (stats.descalificados / stats.agendas) * 100 : 0).toFixed(2) + "%",
         "Cerradas": ((stats.agendas > 0 ? stats.cerradas / stats.agendas : 0) * 100).toFixed(2) + "%",
-       "S/Asistencia": ((stats.asistencias > 0 ? stats.asistenciasConVenta / stats.asistencias : 0) * 100).toFixed(2) + "%"
+"S/Asistencia": ((stats.asistencias > 0 ? stats.cerradas / stats.asistencias : 0) * 100).toFixed(2) + "%"
       };
     });
 

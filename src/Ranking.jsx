@@ -140,7 +140,7 @@ const Ranking = () => {
         </div>
       ) : (
         <>
-          <h1 className="p-5 text-4xl md:mb-10 md:text-6xl font-bold text-center text-transparent bg-gradient-to-b from-gray-900 to-gray-600 bg-clip-text drop-shadow-lg tracking-wide">
+          <h1 className="p-5 text-4xl md:mb-10 md:text-6xl font-bold text-center text-transparent bg-gradient-to-t from-white-300 to-gray-100 bg-clip-text drop-shadow-lg tracking-wide">
             Rankings Meg
           </h1>
           {monthlyRankings.map(({ month, ranking, totals }) => (
