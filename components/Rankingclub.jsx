@@ -14,24 +14,10 @@ const RankingClub = () => {
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
 
-  // Traer precios por mes desde el backend
   useEffect(() => {
-    const fetchPrecios = async () => {
-      try {
-        const res = await fetch("https://metricas-back.onrender.com/goals?closer=Club");
-        const data = await res.json();
-        const precios = {};
-        data.forEach(item => {
-          const precio = item.metricas?.Precio?.base || 0;
-          if (item.monthFilter) precios[item.monthFilter] = precio;
-        });
-        setPreciosPorMes(precios);
-      } catch (err) {
-        console.error("Error al traer precios club:", err);
-      }
-    };
     fetchPrecios();
   }, []);
+  
 
   useEffect(() => {
     if (!clubData.length) return;
@@ -119,18 +105,40 @@ const RankingClub = () => {
     }));
   };
 
+  const fetchPrecios = async () => {
+    try {
+      const res = await fetch(" http://localhost:30003/precio-club");
+      const data = await res.json();
+      console.log("📦 Datos recibidos de /precio-club:", data);
+  
+      const precios = {};
+      data.forEach(item => {
+        if (item.mes && typeof item.precio === "number") {
+          precios[item.mes] = item.precio;
+        }
+      });
+  
+      console.log("📅 Precios parseados por mes:", precios);
+      setPreciosPorMes(precios);
+    } catch (err) {
+      console.error("❌ Error al traer precios club:", err);
+    }
+  };
+  
+  
+
   const guardarPrecio = async (monthKey) => {
     const precio = preciosEditados[monthKey];
     const payload = {
-      month: monthKey,
+      mes: monthKey,
       precio: Number(precio)
     };
   
-    console.log("🟨 Enviando payload a update-precio-club:", payload);
+    console.log("🟨 Enviando payload a /precio-club:", payload);
     setGuardandoMes(monthKey);
   
     try {
-      const res = await fetch("https://metricas-back.onrender.com/update-precio-club", {
+      const res = await fetch("http://localhost:30003/precio-club", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -145,18 +153,21 @@ const RankingClub = () => {
       const data = await res.json();
       console.log("✅ Precio guardado correctamente:", data);
   
-      setPreciosPorMes(prev => ({ ...prev, [monthKey]: Number(precio) }));
+      await fetchPrecios(); // ✅ Actualiza con los nuevos datos desde el backend
+  
       setPreciosEditados(prev => {
         const nuevo = { ...prev };
         delete nuevo[monthKey];
         return nuevo;
       });
+  
     } catch (err) {
       console.error("❌ Error en guardarPrecio:", err.message);
     }
   
     setGuardandoMes(null);
   };
+  
   
   
 
