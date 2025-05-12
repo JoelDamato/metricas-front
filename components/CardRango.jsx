@@ -1,9 +1,20 @@
 import { useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import VentasPorFechaConAgendamiento from "./VentasPorFechaConAgendamiento";
+import { useData } from "../components/DataContext";
+import VentasPorFechaConAgendamiento from "../components/VentasPorFechaConAgendamiento";
 
-export default function ResumenPorRango({ API_URL, formatCurrency }) {
+export default function ResumenPorRango({ formatCurrency }) {
+  const {
+    metricasData: rawVentasRaw,
+    metricasClienteData: rawLlamadas,
+    loading: isLoading,
+  } = useData();
+
+  const rawVentas = rawVentasRaw.map(v =>
+    v[1] ? { ...v[1], _id: v._id } : v
+  );
+
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [selectedCloser, setSelectedCloser] = useState("all");
@@ -11,77 +22,95 @@ export default function ResumenPorRango({ API_URL, formatCurrency }) {
   const [availableClosers, setAvailableClosers] = useState([]);
   const [availableOrigins, setAvailableOrigins] = useState([]);
   const [resumen, setResumen] = useState(null);
+  const [ventasFiltradas, setVentasFiltradas] = useState([]);
 
   useEffect(() => {
-    const fetchClosersAndOrigins = async () => {
-      const response = await fetch(API_URL);
-      const data = await response.json();
-      const closers = [...new Set(data.filter(item => item["Venta Meg"] > 0).map(item => item.Responsable))];
-      const origins = [...new Set(data.map(item => item.Origen).filter(Boolean))];
-
-      setAvailableClosers(closers);
-      setAvailableOrigins(origins);
-    };
-    fetchClosersAndOrigins();
-  }, [API_URL]);
+    const closers = [...new Set(rawLlamadas.map(i => i.Closer?.trim()).filter(Boolean))];
+    const origins = [...new Set([
+      ...rawVentas.map(i => i.Origen?.trim()),
+      ...rawLlamadas.map(i => i["Ultimo origen"]?.trim())
+    ].filter(Boolean))];
+    setAvailableClosers(closers);
+    setAvailableOrigins(origins);
+  }, [rawVentas, rawLlamadas]);
 
   useEffect(() => {
-    const fetchResumen = async () => {
-      if (!startDate || !endDate) return;
+    if (!rawVentas.length || !startDate || !endDate) return;
 
-      const response = await fetch(API_URL);
-      const data = await response.json();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
 
-      const agendamientos = data.filter(item => {
-        const fecha = new Date(item["Fecha correspondiente"]);
-        const matchFecha = fecha >= startDate && fecha <= endDate;
-        const matchCloser = selectedCloser === "all" || item.Responsable === selectedCloser;
-        const matchOrigin = selectedOrigin === "all" || item.Origen === selectedOrigin;
-        return item.Agenda === 1 && matchFecha && matchCloser && matchOrigin;
-      });
+    const filtradas = rawVentas.filter(item => {
+      const fecha = new Date(item["Fecha de agendamiento"]);
+      const responsable = item.Responsable?.trim();
+      const origen = item.Origen?.trim();
 
-      const clientesAgendados = new Set(agendamientos.map(i => i["Nombre cliente"]));
-
-      const interaccionesClientes = data.filter(item =>
-        clientesAgendados.has(item["Nombre cliente"]) &&
-        (selectedCloser === "all" || item.Responsable === selectedCloser) &&
-        (selectedOrigin === "all" || item.Origen === selectedOrigin)
+      return (
+        !isNaN(fecha) &&
+        fecha >= start &&
+        fecha <= end &&
+        item["Venta Club"] !== 1 &&
+        (selectedCloser === "all" || responsable === selectedCloser) &&
+        (selectedOrigin === "all" || origen === selectedOrigin)
       );
+    });
 
-      const resumenCalculado = interaccionesClientes.reduce(
-        (acc, item) => {
-          if (item.Agenda === 1) acc.Agenda++;
-          if (item["Aplica?"] === "Aplica") acc.Aplica++;
-          if (item["Llamadas efectuadas"]) acc.Llamadas += item["Llamadas efectuadas"];
-          if (item["Venta Meg"] > 0) acc.Ventas++;
-          if (item["Precio"]) acc.Monto += item["Precio"];
-          if (item["Cash collected total"]) acc.Cash += item["Cash collected total"];
-          if (item["Call Confirm Exitoso"]) acc.Confirm += item["Call Confirm Exitoso"];
-          return acc;
-        },
-        { Agenda: 0, Aplica: 0, Llamadas: 0, Ventas: 0, Monto: 0, Cash: 0, Confirm: 0 }
+    setVentasFiltradas(filtradas);
+  }, [rawVentas, startDate, endDate, selectedCloser, selectedOrigin]);
+
+  useEffect(() => {
+    if (!rawLlamadas.length || !startDate || !endDate) return;
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const llamadasEnRango = rawLlamadas.filter(item => {
+      const fecha = new Date(item["Fecha de agendamiento"]);
+      const closer = item.Closer?.trim();
+      const origen = item["Ultimo origen"]?.trim();
+
+      return (
+        !isNaN(fecha) &&
+        fecha >= start &&
+        fecha <= end &&
+        (selectedCloser === "all" || closer === selectedCloser) &&
+        (selectedOrigin === "all" || origen === selectedOrigin)
       );
+    });
 
-      setResumen(resumenCalculado);
+    const llamadasAgendadas = llamadasEnRango.filter(i => i.Agendo === 1);
+    const idsAgendados = new Set(llamadasAgendadas.map(i => i.id?.replace(/-/g, "")));
+
+    const interaccionesClientes = ventasFiltradas.filter(item => {
+      const idCliente = item["Nombre cliente"]?.replace(/-/g, "");
+      return idsAgendados.has(idCliente);
+    });
+
+    const resumenCalculado = {
+      Agenda: llamadasAgendadas.length,
+      Aplica: llamadasAgendadas.filter(i => i["Aplica N"] === "1").length,
+      Confirm: llamadasAgendadas.reduce(
+        (acc, i) => acc + (i["Aplica N"] === "1" ? (i["Call confirm exitoso"] || 0) : 0), 0
+      ),
+      Llamadas: llamadasAgendadas.reduce((acc, i) => acc + (i["Llamadas efectuadas"] || 0), 0),
+      Ventas: interaccionesClientes.filter(i => i["Venta Meg"] > 0).length,
+      Monto: interaccionesClientes.reduce((acc, i) => acc + (parseFloat(i["Precio"]) || 0), 0),
+      Cash: interaccionesClientes.reduce((acc, i) => acc + (parseFloat(i["Cash collected total"]) || 0), 0),
     };
 
-    fetchResumen();
-  }, [startDate, endDate, selectedCloser, selectedOrigin, API_URL]);
-
-  const getMonthString = (date) => {
-    if (!date) return null;
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-  };
+    setResumen(resumenCalculado);
+  }, [startDate, endDate, selectedCloser, selectedOrigin, rawLlamadas, ventasFiltradas]);
 
   return (
     <div className="w-full md:w-[32%] bg-white rounded-lg shadow-md overflow-visible min-h-[540px] pb-6">
-      <h3 className="text-lg font-bold text-center py-20 bg-gradient-to-r from-[#E0C040] to-[#f7db6b] text-white">
+      <h3 className="text-lg font-bold text-center py-4 bg-gradient-to-r from-[#E0C040] to-[#f7db6b] text-white">
         Resumen por Rango
       </h3>
 
       <div className="p-4 space-y-4">
-        {/* Filtros */}
-        <div className="flex flex-col sm:flex-row justify-between gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <DatePicker
             selected={startDate}
             onChange={(date) => setStartDate(date)}
@@ -124,35 +153,32 @@ export default function ResumenPorRango({ API_URL, formatCurrency }) {
           ))}
         </select>
 
-        {/* Datos */}
         {resumen && (
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            {[ 
-              { label: "Llamadas Agendadas", value: resumen.Agenda },
-              { label: "Llamadas Aplicables", value: resumen.Aplica },
-              { label: "Call Confirm Exitoso", value: resumen.Confirm },
-              { label: "Llamadas Efectuadas", value: resumen.Llamadas },
-              { label: "Llamadas Vendidas", value: resumen.Ventas },
-              { label: "Monto Total", value: formatCurrency(resumen.Monto) },
-              { label: "Cash Collected", value: formatCurrency(resumen.Cash) }
-            ].map(({ label, value }, idx) => (
-              <div key={idx} className="bg-gray-50 p-3 rounded-lg shadow text-center">
-                <div className="text-sm font-semibold text-gray-600">{label}</div>
-                <div className="text-lg font-bold text-gray-800">{value}</div>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-3 mt-4 text-center">
+            <div><p className="font-semibold">Llamadas Agendadas</p><p>{resumen.Agenda}</p></div>
+            <div><p className="font-semibold">Llamadas Aplicables</p><p>{resumen.Aplica}</p></div>
+            <div><p className="font-semibold">Call Confirm Exitoso</p><p>{resumen.Confirm}</p></div>
+            <div><p className="font-semibold">Llamadas Efectuadas</p><p>{resumen.Llamadas}</p></div>
+            <div><p className="font-semibold">Llamadas Vendidas</p><p>{resumen.Ventas}</p></div>
+            <div><p className="font-semibold">Monto Total</p><p>{formatCurrency(resumen.Monto)}</p></div>
+            <div><p className="font-semibold">Cash Collected</p><p>{formatCurrency(resumen.Cash)}</p></div>
+            <div><p className="font-semibold">% Real Cobrado</p><p>
+              {resumen.Monto > 0
+                ? `${((resumen.Cash / resumen.Monto) * 100).toFixed(2)}%`
+                : "0%"}
+            </p></div>
           </div>
         )}
 
-        {/* Ventas agrupadas por agendamiento */}
-        {startDate && (
-          <VentasPorFechaConAgendamiento
-  startDate={startDate}
-  endDate={endDate}
-  closer={selectedCloser}
-  origin={selectedOrigin}
-/>
-
+        {ventasFiltradas.length > 0 && (
+          <div className="mt-6">
+            <VentasPorFechaConAgendamiento
+              rawVentas={ventasFiltradas}
+              month={null}
+              closer={selectedCloser}
+              origin={selectedOrigin}
+            />
+          </div>
         )}
       </div>
     </div>

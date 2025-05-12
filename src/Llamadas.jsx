@@ -15,6 +15,14 @@ export default function SalesMetricsTable() {
     loading: isLoading,
   } = useData();
 
+
+
+console.log("📦 Datos de useData()", {
+  rawVentas,
+  rawLlamadas,
+  isLoading,
+});
+
   const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/metricas"
     : "http://localhost:30003/metricas"
@@ -401,6 +409,60 @@ useEffect(() => {
 
   return () => clearInterval(interval);
 }, [isLoading]);
+
+useEffect(() => {
+  if (!rawVentas.length || !monthlyData.length) return;
+
+  const nuevosPromedios = {};
+
+  const ventasFiltradas = rawVentas.filter(item => {
+    if (!item["Fecha de agendamiento"] || !item["Fecha correspondiente"]) return false;
+    if (item["Venta Meg"] <= 0 || item["Venta Club"] === 1) return false;
+
+    const matchCloser =
+      selectedCloser === "all" || item.Responsable === selectedCloser;
+    const matchOrigin =
+      selectedOrigin === "all" || item.Origen === selectedOrigin;
+
+    return matchCloser && matchOrigin;
+  });
+
+  ventasFiltradas.forEach(item => {
+    const fechaAgenda = new Date(item["Fecha de agendamiento"]);
+    const fechaVenta = new Date(item["Fecha correspondiente"]);
+
+    if (!isNaN(fechaAgenda) && !isNaN(fechaVenta)) {
+      const mesAgendamiento = `${fechaAgenda.getFullYear()}-${String(
+        fechaAgenda.getMonth() + 1
+      ).padStart(2, "0")}`;
+      const diferenciaDias = Math.floor(
+        (fechaVenta - fechaAgenda) / (1000 * 60 * 60 * 24)
+      );
+
+      if (!nuevosPromedios[mesAgendamiento]) {
+        nuevosPromedios[mesAgendamiento] = {
+          total: 0,
+          count: 0,
+        };
+      }
+
+      nuevosPromedios[mesAgendamiento].total += diferenciaDias;
+      nuevosPromedios[mesAgendamiento].count += 1;
+    }
+  });
+
+  setMonthlyData(prev =>
+    prev.map(([month, data]) => {
+      const intervalo = nuevosPromedios[month];
+      const promedio =
+        intervalo && intervalo.count > 0
+          ? intervalo.total / intervalo.count
+          : 0;
+      return [month, { ...data, intervaloPromedioDias: promedio }];
+    })
+  );
+}, [rawVentas, selectedCloser, selectedOrigin]);
+
 
 
 
