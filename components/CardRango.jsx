@@ -170,16 +170,7 @@ export default function ResumenPorRango({ formatCurrency }) {
           </div>
         )}
 
-        {ventasFiltradas.length > 0 && (
-          <div className="mt-6">
-            <VentasPorFechaConAgendamiento
-              rawVentas={ventasFiltradas}
-              month={null}
-              closer={selectedCloser}
-              origin={selectedOrigin}
-            />
-          </div>
-        )}
+        
       </div>
     </div>
   );
