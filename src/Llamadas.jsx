@@ -136,43 +136,66 @@ let totalCashAbril = 0;
 let totalPrecioAbril = 0;
 const idsYaSumados = new Set();
 
+const intervaloVentas = {};
+
 ventas.forEach(item => {
-  if (item["Fecha de agendamiento"] && item["Venta Club"] !== 1) {
-    const fechaAgendamiento = new Date(item["Fecha de agendamiento"]);
-    if (!isNaN(fechaAgendamiento)) {
-      const mesAgendamiento = `${fechaAgendamiento.getFullYear()}-${String(fechaAgendamiento.getMonth() + 1).padStart(2, "0")}`;
+  const esMegValida = item["Venta Meg"] > 0 && item["Venta Club"] !== 1;
+  const fechaAgendamiento = parseFechaSegura(item["Fecha de agendamiento"]);
+  const fechaVenta = parseFechaSegura(item["Fecha correspondiente"]);
 
-      const rawId = item.id || item.ID || item.Id;
-      const id = rawId?.replace(/-/g, ""); // ✅ sin guiones
+  if (fechaAgendamiento && esMegValida) {
+    const mesAgendamiento = `${fechaAgendamiento.getFullYear()}-${String(fechaAgendamiento.getMonth() + 1).padStart(2, "0")}`;
 
-      const cash = item["Cash collected total"] || 0;
-      const precio = item["Precio"] || 0;
+    const rawId = item.id || item.ID || item.Id;
+    const id = rawId?.replace(/-/g, "");
 
-      if (!acc[mesAgendamiento]) acc[mesAgendamiento] = crearEstructuraMes();
-      acc[mesAgendamiento]["Venta Meg"] += item["Venta Meg"] || 0;
-      acc[mesAgendamiento]["Monto"] += precio;
-      acc[mesAgendamiento]["Cash collected"] += cash;
+    const cash = item["Cash collected total"] || 0;
+    const precio = item["Precio"] || 0;
 
-      // Solo para abril
-      if (mesAgendamiento === "2025-04" && cash > 0) {
-        const incluido = cashAbrilEsperado.has(id);
-        if (incluido) {
-          totalCashAbril += cash;
-          totalPrecioAbril += precio;
-          idsYaSumados.add(id);
-        }
+    if (!acc[mesAgendamiento]) acc[mesAgendamiento] = crearEstructuraMes();
 
-        console.log("[CASH DETECTADO ABRIL]", {
-          idOriginal: rawId,
-          idSinGuiones: id,
-          cash,
-          precio,
-          incluido
-        });
+    acc[mesAgendamiento]["Venta Meg"] += item["Venta Meg"] || 0;
+    acc[mesAgendamiento]["Monto"] += precio;
+    acc[mesAgendamiento]["Cash collected"] += cash;
+
+    // 🧮 Calcular intervalo
+    if (fechaVenta && !isNaN(fechaVenta)) {
+      const dias = Math.floor((fechaVenta - fechaAgendamiento) / (1000 * 60 * 60 * 24));
+      if (!intervaloVentas[mesAgendamiento]) {
+        intervaloVentas[mesAgendamiento] = { total: 0, count: 0 };
       }
+      intervaloVentas[mesAgendamiento].total += dias;
+      intervaloVentas[mesAgendamiento].count += 1;
+    }
+
+    // 🟡 Solo para abril
+    if (mesAgendamiento === "2025-04" && cash > 0) {
+      const incluido = cashAbrilEsperado.has(id);
+      if (incluido) {
+        totalCashAbril += cash;
+        totalPrecioAbril += precio;
+        idsYaSumados.add(id);
+      }
+
+      console.log("[CASH DETECTADO ABRIL]", {
+        idOriginal: rawId,
+        idSinGuiones: id,
+        cash,
+        precio,
+        incluido
+      });
     }
   }
 });
+
+// ⏱️ Asignar intervalos al final
+for (const mes in intervaloVentas) {
+  const { total, count } = intervaloVentas[mes];
+  if (acc[mes]) {
+    acc[mes].intervaloPromedioDias = total / count;
+  }
+}
+
 
 
     
@@ -410,58 +433,6 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, [isLoading]);
 
-useEffect(() => {
-  if (!rawVentas.length || !monthlyData.length) return;
-
-  const nuevosPromedios = {};
-
-  const ventasFiltradas = rawVentas.filter(item => {
-    if (!item["Fecha de agendamiento"] || !item["Fecha correspondiente"]) return false;
-    if (item["Venta Meg"] <= 0 || item["Venta Club"] === 1) return false;
-
-    const matchCloser =
-      selectedCloser === "all" || item.Responsable === selectedCloser;
-    const matchOrigin =
-      selectedOrigin === "all" || item.Origen === selectedOrigin;
-
-    return matchCloser && matchOrigin;
-  });
-
-  ventasFiltradas.forEach(item => {
-    const fechaAgenda = new Date(item["Fecha de agendamiento"]);
-    const fechaVenta = new Date(item["Fecha correspondiente"]);
-
-    if (!isNaN(fechaAgenda) && !isNaN(fechaVenta)) {
-      const mesAgendamiento = `${fechaAgenda.getFullYear()}-${String(
-        fechaAgenda.getMonth() + 1
-      ).padStart(2, "0")}`;
-      const diferenciaDias = Math.floor(
-        (fechaVenta - fechaAgenda) / (1000 * 60 * 60 * 24)
-      );
-
-      if (!nuevosPromedios[mesAgendamiento]) {
-        nuevosPromedios[mesAgendamiento] = {
-          total: 0,
-          count: 0,
-        };
-      }
-
-      nuevosPromedios[mesAgendamiento].total += diferenciaDias;
-      nuevosPromedios[mesAgendamiento].count += 1;
-    }
-  });
-
-  setMonthlyData(prev =>
-    prev.map(([month, data]) => {
-      const intervalo = nuevosPromedios[month];
-      const promedio =
-        intervalo && intervalo.count > 0
-          ? intervalo.total / intervalo.count
-          : 0;
-      return [month, { ...data, intervaloPromedioDias: promedio }];
-    })
-  );
-}, [rawVentas, selectedCloser, selectedOrigin]);
 
 
 
