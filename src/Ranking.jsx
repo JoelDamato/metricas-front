@@ -32,7 +32,8 @@ const Ranking = () => {
       const date = new Date(item["Fecha correspondiente"]);
       return !isNaN(date) &&
         date.getFullYear() === currentYear &&
-        parseInt(item["Venta Club"] || 0) !== 1;
+ parseInt(item["Venta Club"] || 0) !== 1 &&
+    parseInt(item["Venta Meg"] || 0) === 1
     });
   
     const groupedByMonth = filteredData.reduce((acc, curr) => {
