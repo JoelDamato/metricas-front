@@ -403,11 +403,15 @@ if (soloEnTabla.length > 0) {
     if (data.length === 0) return;
 
     // Filtrar los datos por el mes seleccionado
-    const filteredData = data.filter((row) => {
-      const fecha = new Date(row["Fecha correspondiente"]);
-      const monthYear = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-      return monthYear === monthFilter;
-    });
+const filteredData = data.filter((row) => {
+  const fecha = new Date(row["Fecha correspondiente"]);
+  const monthYear = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+  return (
+    monthYear === monthFilter &&
+    row["Venta Club"] !== 1 // 👈 Excluir ventas Club
+  );
+});
+
 
     const clientesAgendadosEnElMes = new Set(
       filteredData
