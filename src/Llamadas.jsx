@@ -7,7 +7,7 @@ import VentasVendidasPorAgendamiento from "../components/VentasVendidasPorAgenda
 import ResumenPorRango from "../components/CardRango"
 import { useData } from "../components/DataContext";
 
-export default function SalesMetricsTable() {
+export default function Llamadas() {
 
   const {
     metricasData: rawVentas,
@@ -16,12 +16,11 @@ export default function SalesMetricsTable() {
   } = useData();
 
 
+console.log("🟢 useData() llamado");
+console.log("🟢 rawVentas.length:", rawVentas?.length);
+console.log("🟢 rawLlamadas.length:", rawLlamadas?.length);
 
-console.log("📦 Datos de useData()", {
-  rawVentas,
-  rawLlamadas,
-  isLoading,
-});
+
 
   const API_BASE_URL = process.env.NODE_ENV === "production"
     ? "https://metricas-back.onrender.com/metricas"
@@ -82,6 +81,18 @@ console.log("📦 Datos de useData()", {
       const [year] = month.split("-").map(Number);
       return year > 2024;
     });
+
+    console.log("🟢 selectedCloser:", selectedCloser);
+console.log("🟢 selectedOrigin:", selectedOrigin);
+console.log("🟡 llamadasFiltradas.length:", llamadasFiltradas.length);
+console.log("🟡 ventasFiltradas.length:", ventasFiltradas.length);
+console.log("🟡 llamadasFinal.length:", llamadasFinal.length);
+console.log("🟡 ventasFinal.length:", ventasFinal.length);
+console.log("🟣 grouped keys:", Object.keys(grouped));
+console.log("🟣 sorted keys:", sorted.map(([key]) => key));
+console.log("🟣 filteredSorted keys:", filteredSorted.map(([key]) => key));
+
+
 
     setMonthlyData(filteredSorted);
   }, [selectedCloser, selectedOrigin, rawVentas, rawLlamadas]);
@@ -434,6 +445,7 @@ useEffect(() => {
 }, [isLoading]);
 
 
+console.log("🔴 Render completado en /llamadas");
 
 
 

@@ -5,15 +5,14 @@ import Llamadas from './Llamadas';
 import Dash from './Dashboard';
 import Ranking from './Ranking';
 
-
 function App() {
   return (
     <Router>
       <Navbar />
       <Routes>
-        <Route path='/' element={<Dash />} />
-        <Route path="/llamadas" element={<Llamadas />} />
-        <Route path="/Ranking" element={<Ranking />} />
+        <Route path='/' element={<Dash key="dashboard" />} />
+        <Route path="/llamadas" element={<Llamadas key="llamadas" />} />
+        <Route path="/ranking" element={<Ranking key="ranking" />} />
       </Routes>
     </Router>
   );

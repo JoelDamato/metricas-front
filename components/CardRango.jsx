@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useData } from "../components/DataContext";
-import VentasPorFechaConAgendamiento from "../components/VentasPorFechaConAgendamiento";
 
 export default function ResumenPorRango({ formatCurrency }) {
   const {
@@ -11,62 +10,40 @@ export default function ResumenPorRango({ formatCurrency }) {
     loading: isLoading,
   } = useData();
 
-  const rawVentas = rawVentasRaw.map(v =>
-    v[1] ? { ...v[1], _id: v._id } : v
+  // Usar useMemo para evitar recrear el array en cada render
+  const rawVentas = useMemo(() => 
+    rawVentasRaw.map(v => v[1] ? { ...v[1], _id: v._id } : v), 
+    [rawVentasRaw]
   );
 
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [selectedCloser, setSelectedCloser] = useState("all");
   const [selectedOrigin, setSelectedOrigin] = useState("all");
-  const [availableClosers, setAvailableClosers] = useState([]);
-  const [availableOrigins, setAvailableOrigins] = useState([]);
-  const [resumen, setResumen] = useState(null);
-  const [ventasFiltradas, setVentasFiltradas] = useState([]);
 
-  useEffect(() => {
-    const closers = [...new Set(rawLlamadas.map(i => i.Closer?.trim()).filter(Boolean))];
-    const origins = [...new Set([
+  // Usar useMemo para calcular los valores disponibles
+  const availableClosers = useMemo(() => {
+    return [...new Set(rawLlamadas.map(i => i.Closer?.trim()).filter(Boolean))];
+  }, [rawLlamadas]);
+
+  const availableOrigins = useMemo(() => {
+    return [...new Set([
       ...rawVentas.map(i => i.Origen?.trim()),
       ...rawLlamadas.map(i => i["Ultimo origen"]?.trim())
     ].filter(Boolean))];
-    setAvailableClosers(closers);
-    setAvailableOrigins(origins);
   }, [rawVentas, rawLlamadas]);
 
-  useEffect(() => {
-    if (!rawVentas.length || !startDate || !endDate) return;
+  // Calcular el resumen usando useMemo
+  const resumen = useMemo(() => {
+    if (!startDate || !endDate || !rawVentas.length || !rawLlamadas.length) {
+      return null;
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    const filtradas = rawVentas.filter(item => {
-      const fecha = new Date(item["Fecha de agendamiento"]);
-      const responsable = item.Responsable?.trim();
-      const origen = item.Origen?.trim();
-
-      return (
-        !isNaN(fecha) &&
-        fecha >= start &&
-        fecha <= end &&
-        item["Venta Club"] !== 1 &&
-        (selectedCloser === "all" || responsable === selectedCloser) &&
-        (selectedOrigin === "all" || origen === selectedOrigin)
-      );
-    });
-
-    setVentasFiltradas(filtradas);
-  }, [rawVentas, startDate, endDate, selectedCloser, selectedOrigin]);
-
-  useEffect(() => {
-    if (!rawLlamadas.length || !startDate || !endDate) return;
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    const llamadasEnRango = rawLlamadas.filter(item => {
+    const llamadasAgendadas = rawLlamadas.filter(item => {
       const fecha = new Date(item["Fecha de agendamiento"]);
       const closer = item.Closer?.trim();
       const origen = item["Ultimo origen"]?.trim();
@@ -75,33 +52,43 @@ export default function ResumenPorRango({ formatCurrency }) {
         !isNaN(fecha) &&
         fecha >= start &&
         fecha <= end &&
+        item.Agendo === 1 &&
         (selectedCloser === "all" || closer === selectedCloser) &&
         (selectedOrigin === "all" || origen === selectedOrigin)
       );
     });
 
-    const llamadasAgendadas = llamadasEnRango.filter(i => i.Agendo === 1);
     const idsAgendados = new Set(llamadasAgendadas.map(i => i.id?.replace(/-/g, "")));
 
-    const interaccionesClientes = ventasFiltradas.filter(item => {
+    const ventasFiltradas = rawVentas.filter(item => {
+      const fecha = new Date(item["Fecha de agendamiento"]);
+      const responsable = item.Responsable?.trim();
+      const origen = item.Origen?.trim();
       const idCliente = item["Nombre cliente"]?.replace(/-/g, "");
-      return idsAgendados.has(idCliente);
+
+      return (
+        !isNaN(fecha) &&
+        fecha >= start &&
+        fecha <= end &&
+        item["Venta Club"] !== 1 &&
+        (selectedCloser === "all" || responsable === selectedCloser) &&
+        (selectedOrigin === "all" || origen === selectedOrigin) &&
+        idsAgendados.has(idCliente)
+      );
     });
 
-    const resumenCalculado = {
+    return {
       Agenda: llamadasAgendadas.length,
       Aplica: llamadasAgendadas.filter(i => i["Aplica N"] === "1").length,
       Confirm: llamadasAgendadas.reduce(
         (acc, i) => acc + (i["Aplica N"] === "1" ? (i["Call confirm exitoso"] || 0) : 0), 0
       ),
       Llamadas: llamadasAgendadas.reduce((acc, i) => acc + (i["Llamadas efectuadas"] || 0), 0),
-      Ventas: interaccionesClientes.filter(i => i["Venta Meg"] > 0).length,
-      Monto: interaccionesClientes.reduce((acc, i) => acc + (parseFloat(i["Precio"]) || 0), 0),
-      Cash: interaccionesClientes.reduce((acc, i) => acc + (parseFloat(i["Cash collected total"]) || 0), 0),
+      Ventas: ventasFiltradas.filter(i => i["Venta Meg"] > 0).length,
+      Monto: ventasFiltradas.reduce((acc, i) => acc + (parseFloat(i["Precio"]) || 0), 0),
+      Cash: ventasFiltradas.reduce((acc, i) => acc + (parseFloat(i["Cash collected total"]) || 0), 0),
     };
-
-    setResumen(resumenCalculado);
-  }, [startDate, endDate, selectedCloser, selectedOrigin, rawLlamadas, ventasFiltradas]);
+  }, [startDate, endDate, selectedCloser, selectedOrigin, rawVentas, rawLlamadas]);
 
   return (
     <div className="w-full md:w-[32%] bg-white rounded-lg shadow-md overflow-visible min-h-[540px] pb-6">
@@ -169,8 +156,6 @@ export default function ResumenPorRango({ formatCurrency }) {
             </p></div>
           </div>
         )}
-
-        
       </div>
     </div>
   );
