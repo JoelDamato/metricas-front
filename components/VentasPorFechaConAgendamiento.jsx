@@ -19,7 +19,11 @@ export default function VentasConAgendamientoAgrupadas({
     const filtrados = rawVentas.filter((item) => {
       const matchCloser = closer === "all" || item.Responsable === closer;
       const matchOrigin = origin === "all" || item.Origen === origin;
-      return matchCloser && matchOrigin && item["Venta Meg"] > 0 && item["Fecha correspondiente"];
+      return matchCloser &&
+    matchOrigin &&
+    item["Venta Meg"] > 0 &&
+    item["Venta Club"] === 0 && // 👈 NUEVO FILTRO
+    item["Fecha correspondiente"]
     });
 
     // 🗓️ Filtrar por mes o rango
