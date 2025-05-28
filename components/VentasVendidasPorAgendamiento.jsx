@@ -33,7 +33,9 @@ export default function VentasPorMesDeAgendamiento({
 
     // ✅ Filtrar ventas MEG válidas
     const ventasMeg = dataFiltrada.filter(item =>
-      item["Venta Meg"] > 0 && item["Fecha correspondiente"]
+      item["Venta Meg"] > 0 &&
+    item["Venta Club"] === 0 && 
+     item["Fecha correspondiente"]
     );
 
     // 🧠 Agrupar por mes de agendamiento
