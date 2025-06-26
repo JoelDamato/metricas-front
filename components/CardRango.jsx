@@ -120,7 +120,10 @@ export default function ResumenPorRango({ formatCurrency }) {
       Confirm: llamadasAgendadas.reduce(
         (acc, i) => acc + (i["Aplica N"] === "1" ? (i["Call confirm exitoso"] || 0) : 0), 0
       ),
-      Llamadas: llamadasAgendadas.reduce((acc, i) => acc + (i["Llamadas efectuadas"] || 0), 0),
+      // Solo sumar llamadas efectuadas si Aplica N === "1"
+      Llamadas: llamadasAgendadas.reduce(
+        (acc, i) => acc + (i["Aplica N"] === "1" ? (i["Llamadas efectuadas"] || 0) : 0), 0
+      ),
       Ventas: ventasFiltradas.filter(i => i["Venta Meg"] > 0).length,
       Monto: ventasFiltradas.reduce((acc, i) => acc + (parseFloat(i["Precio"]) || 0), 0),
       Cash: ventasFiltradas.reduce((acc, i) => acc + (parseFloat(i["Cash collected total"]) || 0), 0),
