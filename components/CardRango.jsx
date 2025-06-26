@@ -33,43 +33,80 @@ export default function ResumenPorRango({ formatCurrency }) {
     ].filter(Boolean))];
   }, [rawVentas, rawLlamadas]);
 
+  // Utilidad para comparar solo fechas (sin horas) - CORREGIDA
+  function isDateInRange(dateString, start, end) {
+    if (!dateString || !start || !end) return false;
+    
+    // Parsear la fecha del string - manteniendo consistencia con zona horaria
+    const date = new Date(dateString);
+    if (isNaN(date)) return false;
+    
+    // Convertir todo a strings de fecha en formato YYYY-MM-DD para comparación exacta
+    const dateStr = date.toISOString().split('T')[0];
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+    
+    return dateStr >= startStr && dateStr <= endStr;
+  }
+
+  // Utilidad para obtener el primer y último día del mes - MEJORADA
+  function getMonthRange(date) {
+    if (!date) return [null, null];
+    
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    // Primer día del mes a las 00:00:00
+    const first = new Date(year, month, 1);
+    // Último día del mes a las 23:59:59
+    const last = new Date(year, month + 1, 0);
+    
+    return [first, last];
+  }
+
   // Calcular el resumen usando useMemo
   const resumen = useMemo(() => {
     if (!startDate || !endDate || !rawVentas.length || !rawLlamadas.length) {
       return null;
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    console.log('Rango de fechas:', { 
+      startDate: startDate.toISOString().split('T')[0], 
+      endDate: endDate.toISOString().split('T')[0] 
+    }); // Debug
 
+    // Filtrar llamadas agendadas por fecha de agendamiento
     const llamadasAgendadas = rawLlamadas.filter(item => {
-      const fecha = new Date(item["Fecha de agendamiento"]);
-      const closer = item.Closer?.trim();
-      const origen = item["Ultimo origen"]?.trim();
-
-      return (
-        !isNaN(fecha) &&
-        fecha >= start &&
-        fecha <= end &&
-        item.Agendo === 1 &&
-        (selectedCloser === "all" || closer === selectedCloser) &&
-        (selectedOrigin === "all" || origen === selectedOrigin)
-      );
+      const fechaStr = item["Fecha de agendamiento"];
+      if (!fechaStr) return false;
+      if (item.Agendo !== 1) return false;
+      
+      const inRange = isDateInRange(fechaStr, startDate, endDate);
+      
+      // Debug: log algunas fechas para verificar
+      if (Math.random() < 0.01) { // Solo 1% de las veces para no saturar
+        console.log('Fecha agendamiento:', fechaStr, 'En rango:', inRange);
+      }
+      
+      if (!inRange) return false;
+      if (selectedCloser !== "all" && item.Closer?.trim() !== selectedCloser) return false;
+      if (selectedOrigin !== "all" && item["Ultimo origen"]?.trim() !== selectedOrigin) return false;
+      return true;
     });
+
+    console.log('Llamadas agendadas filtradas:', llamadasAgendadas.length); // Debug
 
     const idsAgendados = new Set(llamadasAgendadas.map(i => i.id?.replace(/-/g, "")));
 
+    // Filtrar ventas por fecha de agendamiento
     const ventasFiltradas = rawVentas.filter(item => {
-      const fecha = new Date(item["Fecha de agendamiento"]);
+      const fechaStr = item["Fecha de agendamiento"];
       const responsable = item.Responsable?.trim();
       const origen = item.Origen?.trim();
       const idCliente = item["Nombre cliente"]?.replace(/-/g, "");
 
       return (
-        !isNaN(fecha) &&
-        fecha >= start &&
-        fecha <= end &&
+        isDateInRange(fechaStr, startDate, endDate) &&
         item["Venta Club"] !== 1 &&
         (selectedCloser === "all" || responsable === selectedCloser) &&
         (selectedOrigin === "all" || origen === selectedOrigin) &&
@@ -90,6 +127,21 @@ export default function ResumenPorRango({ formatCurrency }) {
     };
   }, [startDate, endDate, selectedCloser, selectedOrigin, rawVentas, rawLlamadas]);
 
+  // CORREGIDO: Solo autocompletar si no hay endDate, sin modificar startDate
+  useEffect(() => {
+    if (startDate && !endDate) {
+      const [, last] = getMonthRange(startDate);
+      setEndDate(last);
+    }
+  }, [startDate, endDate]); // Agregué endDate como dependencia
+
+  // Función helper para seleccionar mes completo
+  const selectFullMonth = (date) => {
+    const [first, last] = getMonthRange(date);
+    setStartDate(first);
+    setEndDate(last);
+  };
+
   return (
     <div className="w-full md:w-[32%] bg-white rounded-lg shadow-md overflow-visible min-h-[540px] pb-6">
       <h3 className="text-lg font-bold text-center py-4 bg-gradient-to-r from-[#E0C040] to-[#f7db6b] text-white">
@@ -106,6 +158,7 @@ export default function ResumenPorRango({ formatCurrency }) {
             endDate={endDate}
             placeholderText="Inicio"
             className="border rounded p-1 w-full"
+            dateFormat="dd/MM/yyyy"
           />
           <DatePicker
             selected={endDate}
@@ -115,8 +168,19 @@ export default function ResumenPorRango({ formatCurrency }) {
             endDate={endDate}
             placeholderText="Fin"
             className="border rounded p-1 w-full"
+            dateFormat="dd/MM/yyyy"
           />
         </div>
+
+        {/* Botón para seleccionar mes completo */}
+        {startDate && (
+          <button
+            onClick={() => selectFullMonth(startDate)}
+            className="w-full bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+          >
+            Seleccionar mes completo ({startDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })})
+          </button>
+        )}
 
         <select
           className="w-full border rounded p-1"
@@ -154,6 +218,13 @@ export default function ResumenPorRango({ formatCurrency }) {
                 ? `${((resumen.Cash / resumen.Monto) * 100).toFixed(2)}%`
                 : "0%"}
             </p></div>
+          </div>
+        )}
+
+        {/* Información de debug */}
+        {startDate && endDate && (
+          <div className="text-xs text-gray-500 mt-2">
+            Rango: {startDate.toLocaleDateString('es-ES')} - {endDate.toLocaleDateString('es-ES')}
           </div>
         )}
       </div>
