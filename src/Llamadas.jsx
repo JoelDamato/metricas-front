@@ -117,8 +117,11 @@ console.log("🟣 filteredSorted keys:", filteredSorted.map(([key]) => key));
             if (item["Aplica N"] === "1") {
               acc[mesAgendamiento]["Aplica?"] += 1;
               acc[mesAgendamiento]["Call Confirm Exitoso"] += item["Call confirm exitoso"] || 0;
+              // Solo sumar llamadas efectuadas si Aplica N === "1"
+              acc[mesAgendamiento]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
             }
-            acc[mesAgendamiento]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
+            // Eliminar la suma fuera del filtro Aplica N === "1"
+            // acc[mesAgendamiento]["Llamadas efectuadas"] += item["Llamadas efectuadas"] || 0;
           }
         }
       }
